@@ -1,0 +1,23 @@
+{
+  "name": "Mail",
+  "short_name": "Mail",
+  "description": "Minimalist mail with Vim navigation & Rosé Pine design",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#232136",
+  "theme_color": "#232136",
+  "icons": [
+    {
+      "src": "/icons/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icons/apple-touch-icon.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

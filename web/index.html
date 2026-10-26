@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Mail">
+  <meta name="theme-color" content="#232136" media="(prefers-color-scheme: dark)">
+  <meta name="theme-color" content="#faf4ed" media="(prefers-color-scheme: light)">
+  <title>Mail</title>
+  <link rel="icon" type="image/svg+xml" href="/icons/icon.svg">
+  <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+  <link rel="manifest" href="/manifest.json">
+  <link rel="stylesheet" href="/css/style.css">
+  <script type="module" src="/js/app.js"></script>
+</head>
+<body>
+  <div class="app">
+    <aside class="sidebar" id="sidebar" aria-label="Folders">
+      <div class="sidebar-header">
+        <span class="brand">Mail</span>
+        <button type="button" class="icon-button" id="settings-menu" title="Settings"></button>
+      </div>
+      <button type="button" class="compose-button" id="compose-button" title="New message (c)"></button>
+      <nav class="folder-nav" id="folders"></nav>
+    </aside>
+    <div class="sidebar-backdrop" id="sidebar-backdrop"></div>
+
+    <section class="list-pane" id="list-pane">
+      <header class="pane-header">
+        <button type="button" class="icon-button menu-toggle" id="menu-toggle" title="Folders" aria-label="Open the folders"></button>
+        <h1 class="list-title" id="list-title"></h1>
+        <button type="button" class="icon-button" id="search-button" title="Search (/)"></button>
+        <button type="button" class="icon-button" id="refresh-button" title="Check for new mail"></button>
+      </header>
+      <div class="search-bar" id="search-bar" hidden>
+        <input type="search" class="search-input" id="search-input" placeholder="Search · from: to: is:unread has:attachment in:all" autocomplete="off" spellcheck="false">
+      </div>
+      <div class="thread-list" id="thread-list" role="listbox" aria-label="Conversations"></div>
+    </section>
+
+    <main class="reader-pane" id="reader" aria-label="Conversation"></main>
+  </div>
+
+  <button type="button" class="fab" id="fab" title="New message" aria-label="New message"></button>
+
+  <footer class="statusbar">
+    <div class="status-left">
+      <span class="status-mode" id="status-mode">-- NORMAL --</span>
+      <span class="status-position" id="status-position"></span>
+      <span class="status-sync" id="status-sync"></span>
+    </div>
+    <div class="status-hints">
+      <span><kbd>j</kbd><kbd>k</kbd> move</span>
+      <span><kbd>l</kbd> open</span>
+      <span><kbd>d</kbd> done</span>
+      <span><kbd>r</kbd> reply</span>
+      <span><kbd>c</kbd> compose</span>
+      <span><kbd>/</kbd> search</span>
+      <button type="button" class="status-help" id="status-help"><kbd>?</kbd> help</button>
+    </div>
+  </footer>
+</body>
+</html>

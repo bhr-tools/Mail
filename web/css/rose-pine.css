@@ -1,0 +1,55 @@
+/* Rosé Pine palette (https://rosepinetheme.com): Moon for dark mode,
+   Dawn for light mode, following the system setting. */
+
+:root {
+  color-scheme: dark;
+  --rp-base: #232136;
+  --rp-surface: #2a273f;
+  --rp-overlay: #393552;
+  --rp-muted: #6e6a86;
+  --rp-subtle: #908caa;
+  --rp-text: #e0def4;
+  --rp-love: #eb6f92;
+  --rp-gold: #f6c177;
+  --rp-rose: #ea9a97;
+  --rp-pine: #3e8fb0;
+  --rp-foam: #9ccfd8;
+  --rp-iris: #c4a7e7;
+  --rp-hl-low: #2a283e;
+  --rp-hl-med: #44415a;
+  --rp-hl-high: #56526e;
+
+  /* Roles */
+  --accent: var(--rp-rose);
+  --on-accent: #232136;
+  --danger: var(--rp-love);
+  --border: rgba(110, 106, 134, 0.28);
+  --shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
+  --backdrop: rgba(10, 9, 20, 0.6);
+}
+
+@media (prefers-color-scheme: light) {
+  :root {
+    color-scheme: light;
+    --rp-base: #faf4ed;
+    --rp-surface: #fffaf3;
+    --rp-overlay: #f2e9e1;
+    --rp-muted: #9893a5;
+    --rp-subtle: #797593;
+    --rp-text: #575279;
+    --rp-love: #b4637a;
+    --rp-gold: #ea9d34;
+    --rp-rose: #d7827e;
+    --rp-pine: #286983;
+    --rp-foam: #56949f;
+    --rp-iris: #907aa9;
+    --rp-hl-low: #f4ede8;
+    --rp-hl-med: #dfdad9;
+    --rp-hl-high: #cecacd;
+
+    --on-accent: #2a273f;
+    --border: rgba(121, 117, 147, 0.25);
+    --shadow: 0 10px 30px rgba(87, 82, 121, 0.18);
+    --backdrop: rgba(87, 82, 121, 0.35);
+  }
+}
