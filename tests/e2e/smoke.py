@@ -38,6 +38,10 @@ def frame_of(page, card):
     return card.locator("iframe.mail-frame").content_frame
 
 
+def folders(page):
+    return page.locator("#folders .folder-row")
+
+
 def setup(page):
     page.goto(BASE)
     page.get_by_placeholder("At least 4 characters").fill(PASSWORD)
@@ -52,6 +56,11 @@ def desktop(browser):
     watch(page)
     setup(page)
     expect(page.locator("#list-title")).to_contain_text("Inbox")
+    # Folded: the inbox only. + unfolds every folder, the own ones included.
+    expect(folders(page)).to_have_count(1)
+    page.keyboard.press("+")
+    expect(folders(page)).to_have_text(["Inbox4", "Archive", "Sent", "Drafts1", "Trash", "Projects", "Robotics1", "Receipts"])
+    expect(page.locator(".nav-section")).to_have_attribute("aria-expanded", "true")
     expect(rows(page).first).to_contain_text("Climbing on Saturday?")
     expect(page.locator(".thread-row.unread")).to_have_count(4)
     expect(page.locator(".row-snippet").first).to_contain_text("climbing gym")
@@ -98,11 +107,13 @@ def desktop(browser):
     expect(page.locator(".toast")).to_contain_text("Archived")
     expect(rows(page)).to_have_count(3)
     expect(page.locator(".reader-subject")).to_have_text("Invoice for the gala hall")
-    page.keyboard.press("g")
-    page.keyboard.press("a")
+    # Shift+J / Shift+K: next / previous folder (once the reader is closed).
+    page.keyboard.press("h")
+    page.keyboard.press("J")
+    expect(page.locator("#list-title")).to_contain_text("Archive")
     expect(row(page, "Five books")).to_have_count(1)
-    page.keyboard.press("g")
-    page.keyboard.press("i")
+    page.keyboard.press("K")
+    expect(page.locator("#list-title")).to_contain_text("Inbox")
     page.keyboard.press("z")
     expect(page.locator(".toast")).to_contain_text("Undone")
     expect(rows(page)).to_have_count(4)
@@ -162,8 +173,9 @@ def desktop(browser):
     expect(page.locator(".toast")).to_contain_text("Draft saved")
     expect(compose).to_have_count(0)
 
-    page.keyboard.press("g")
-    page.keyboard.press("d")
+    page.keyboard.press("h")
+    for _ in range(3):
+        page.keyboard.press("J")
     expect(page.locator("#list-title")).to_contain_text("Drafts")
     expect(row(page, "Saturday")).to_have_count(1)
     expect(row(page, "Saturday")).to_contain_text("To: Léa Dubois")
@@ -174,8 +186,8 @@ def desktop(browser):
     page.keyboard.press("Escape")
 
     # The reply reached Sent.
-    page.keyboard.press("g")
-    page.keyboard.press("s")
+    page.keyboard.press("K")
+    expect(page.locator("#list-title")).to_contain_text("Sent")
     # Both answers to Camille, in one conversation.
     expect(rows(page)).to_have_count(1)
     expect(row(page, "Re: Lab report review").locator(".row-count")).to_have_text("2")
@@ -195,9 +207,22 @@ def desktop(browser):
     page.keyboard.press("Escape")
     expect(page.locator("#list-title")).to_contain_text("Sent")
 
+    # A folded account still shows the folder being viewed.
+    page.keyboard.press("+")
+    expect(folders(page)).to_have_text([re.compile(r"^Inbox\d*$"), "Sent"])
+    page.keyboard.press("+")
+
+    # An own folder (a Gmail label), nested.
+    for _ in range(4):
+        page.keyboard.press("J")
+    expect(page.locator("#list-title")).to_contain_text("Robotics")
+    expect(rows(page)).to_have_count(1)
+    expect(rows(page).first).to_contain_text("Motor driver datasheet")
+
     # Star and read state, in the inbox.
-    page.keyboard.press("g")
-    page.keyboard.press("i")
+    for _ in range(6):
+        page.keyboard.press("K")
+    expect(page.locator("#list-title")).to_contain_text("Inbox")
     expect(rows(page)).to_have_count(4)
     page.keyboard.press("j")
     page.keyboard.press("s")

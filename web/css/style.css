@@ -376,22 +376,30 @@ select.input { cursor: pointer; }
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 14px 8px 4px;
+  width: 100%;
+  margin-top: 10px;
+  padding: 4px 8px;
+  border-radius: 6px;
+  text-align: left;
   color: var(--rp-muted);
   font-size: 0.7rem;
   font-weight: 700;
   letter-spacing: 0.06em;
   text-transform: uppercase;
 }
+.nav-section:hover { background: var(--rp-overlay); color: var(--rp-subtle); }
+.nav-section-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.nav-chevron { transition: transform 0.15s; }
+.nav-section.open .nav-chevron { transform: rotate(90deg); }
 .nav-section .account-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--acc); }
-.nav-section .sync-error { margin-left: auto; color: var(--danger); text-transform: none; letter-spacing: 0; }
+.nav-section .sync-error { color: var(--danger); text-transform: none; letter-spacing: 0; }
 .folder-row {
   display: flex;
   align-items: center;
   gap: 10px;
   width: 100%;
   min-height: 32px;
-  padding: 4px 8px;
+  padding: 4px 8px 4px calc(8px + var(--indent, 0) * 14px);
   border-radius: 6px;
   color: var(--rp-subtle);
   font-size: 0.86rem;

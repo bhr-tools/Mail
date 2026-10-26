@@ -267,6 +267,14 @@ var usualNames = map[string][]string{
 	config.Trash:   {"trash", "deleted items", "deleted messages", "bin", "corbeille", "éléments supprimés"},
 }
 
+// noise are folders some servers show over IMAP that hold no mail to read
+// (Zimbra's contacts and chats), or junk.
+var noise = map[string]bool{
+	"junk": true, "spam": true, "chats": true, "contacts": true, "emailed contacts": true,
+	"calendar": true, "tasks": true, "briefcase": true, "outbox": true, "templates": true,
+	"courrier indésirable": true, "pourriel": true,
+}
+
 var specialUse = map[imap.MailboxAttr]string{
 	imap.MailboxAttrAll:     config.Archive,
 	imap.MailboxAttrArchive: config.Archive,
@@ -288,9 +296,17 @@ func (a *Account) resolveFolders(c *imapclient.Client) error {
 	found := map[string]string{config.Inbox: "INBOX"}
 	byName := map[string]string{}
 	var all []string
+	// Candidates for the person's own folders: not special, not system.
+	var own []string
 	for _, l := range list {
 		selectable := true
+		special := false
 		for _, attr := range l.Attrs {
+			switch attr {
+			case imap.MailboxAttrAll, imap.MailboxAttrArchive, imap.MailboxAttrSent, imap.MailboxAttrDrafts,
+				imap.MailboxAttrTrash, imap.MailboxAttrJunk, imap.MailboxAttrFlagged, imap.MailboxAttrImportant:
+				special = true
+			}
 			if attr == imap.MailboxAttrNoSelect || attr == imap.MailboxAttrNonExistent {
 				selectable = false
 			}
@@ -312,6 +328,11 @@ func (a *Account) resolveFolders(c *imapclient.Client) error {
 			}
 		}
 		byName[strings.ToLower(last)] = l.Mailbox
+		// Gmail keeps its system folders under [Gmail] (or [Google Mail]).
+		system := strings.HasPrefix(l.Mailbox, "[Gmail]") || strings.HasPrefix(l.Mailbox, "[Google Mail]")
+		if !special && !system && !strings.EqualFold(l.Mailbox, "INBOX") && !noise[strings.ToLower(last)] {
+			own = append(own, l.Mailbox)
+		}
 	}
 	for role, names := range usualNames {
 		if found[role] != "" {
@@ -337,6 +358,25 @@ func (a *Account) resolveFolders(c *imapclient.Client) error {
 		if _, err := a.store.EnsureFolder(a.cfg.ID, role, found[role]); err != nil {
 			return err
 		}
+	}
+	// The person's folders, minus those holding a role.
+	taken := map[string]bool{}
+	for _, name := range found {
+		taken[name] = true
+	}
+	var keep []string
+	for _, name := range own {
+		if taken[name] {
+			continue
+		}
+		role := config.CustomRole(name)
+		if _, err := a.store.EnsureFolder(a.cfg.ID, role, name); err != nil {
+			return err
+		}
+		keep = append(keep, role)
+	}
+	if err := a.store.DropCustomFoldersExcept(a.cfg.ID, keep); err != nil {
+		return err
 	}
 	sort.Strings(all)
 	a.mu.Lock()

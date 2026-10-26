@@ -12,11 +12,13 @@ type Query struct {
 	db.Filter
 	// Text is the words looked for, without the filters.
 	Text string
+	all  bool
 }
 
 // ParseQuery reads a search: words, "quoted phrases" and filters
 // (from:, to:, in:, account:, is:unread, is:starred, has:attachment).
-// Everything but the trash is searched unless in: says otherwise.
+// Everything but the trash is searched unless in: says otherwise; in: also
+// takes the name of a folder made by the person (in:Receipts).
 func ParseQuery(s string) Query {
 	var q Query
 	var words, terms []string
@@ -36,12 +38,15 @@ func ParseQuery(s string) Query {
 			case "in":
 				switch v := strings.ToLower(value); v {
 				case "all", "anywhere":
-					q.Roles = append([]string{}, config.Roles...)
+					q.Roles, q.ExcludeRoles = nil, nil
+					q.all = true
 				case "done", "archived":
 					q.Roles = []string{config.Archive}
 				default:
 					if isRole(v) {
 						q.Roles = []string{v}
+					} else {
+						q.Roles = []string{config.CustomRole(value)}
 					}
 				}
 				continue
@@ -68,8 +73,8 @@ func ParseQuery(s string) Query {
 		}
 		terms = append(terms, term)
 	}
-	if q.Roles == nil {
-		q.Roles = []string{config.Inbox, config.Archive, config.Sent, config.Drafts}
+	if q.Roles == nil && !q.all {
+		q.ExcludeRoles = []string{config.Trash}
 	}
 	q.Match = strings.Join(terms, " ")
 	q.Text = strings.Join(words, " ")

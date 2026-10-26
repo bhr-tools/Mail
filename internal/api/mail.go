@@ -6,6 +6,7 @@ import (
 	"mime"
 	"net/http"
 	"net/url"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -44,6 +45,22 @@ func (a *API) accounts(w http.ResponseWriter, r *http.Request) {
 			fail(w, r, err)
 			return
 		}
+		// The five roles in their order, then the person's folders by name.
+		rank := func(role string) int {
+			for i, r := range config.Roles {
+				if r == role {
+					return i
+				}
+			}
+			return len(config.Roles)
+		}
+		sort.SliceStable(folders, func(i, j int) bool {
+			ri, rj := rank(folders[i].Role), rank(folders[j].Role)
+			if ri != rj {
+				return ri < rj
+			}
+			return strings.ToLower(folders[i].Name) < strings.ToLower(folders[j].Name)
+		})
 		for _, f := range folders {
 			unread, total, err := a.store.FolderCounts(f.ID)
 			if err != nil {
@@ -141,7 +158,7 @@ type threadJSON struct {
 // viewFilter returns the filter of a folder view: one role, of one account
 // or every account.
 func (a *API) viewFilter(view, account string) (db.Filter, error) {
-	if !isRole(view) {
+	if !isView(view) {
 		return db.Filter{}, invalid("Unknown folder")
 	}
 	f := db.Filter{Roles: []string{view}, Account: account}
@@ -158,6 +175,12 @@ func (a *API) viewFilter(view, account string) (db.Filter, error) {
 		}
 	}
 	return f, nil
+}
+
+// isView reports whether a list can show a folder role: one of the five,
+// or a folder made by the person.
+func isView(role string) bool {
+	return isRole(role) || config.IsCustom(role)
 }
 
 func isRole(role string) bool {
@@ -501,7 +524,7 @@ func (a *API) act(w http.ResponseWriter, r *http.Request) {
 	if !decode(w, r, &req) {
 		return
 	}
-	if !isRole(req.View) {
+	if !isView(req.View) {
 		fail(w, r, invalid("Unknown folder"))
 		return
 	}

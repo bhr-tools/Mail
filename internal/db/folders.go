@@ -77,6 +77,21 @@ func (s *Store) DropAccountsExcept(ids []string) error {
 	return err
 }
 
+// DropCustomFoldersExcept forgets the folders made by the person that are
+// gone from the server (their roles start with "folder:").
+func (s *Store) DropCustomFoldersExcept(account string, keep []string) error {
+	query := `DELETE FROM folders WHERE account = ? AND role LIKE 'folder:%'`
+	args := []any{account}
+	if len(keep) > 0 {
+		query += ` AND role NOT IN (` + placeholders(len(keep)) + `)`
+		for _, r := range keep {
+			args = append(args, r)
+		}
+	}
+	_, err := s.db.Exec(query, args...)
+	return err
+}
+
 // Folders returns the folders of an account.
 func (s *Store) Folders(account string) ([]*Folder, error) {
 	rows, err := s.db.Query(`SELECT `+folderColumns+` FROM folders WHERE account = ? ORDER BY id`, account)

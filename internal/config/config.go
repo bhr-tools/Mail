@@ -44,6 +44,20 @@ const (
 // Roles lists the folder roles in the order of the sidebar.
 var Roles = []string{Inbox, Archive, Sent, Drafts, Trash}
 
+// CustomPrefix starts the role of a folder made by the person (a Gmail
+// label): "folder:Receipts". The app keeps a copy of these too.
+const CustomPrefix = "folder:"
+
+// CustomRole returns the role of a folder made by the person.
+func CustomRole(name string) string {
+	return CustomPrefix + name
+}
+
+// IsCustom reports whether a role is the one of a folder made by the person.
+func IsCustom(role string) bool {
+	return strings.HasPrefix(role, CustomPrefix) && len(role) > len(CustomPrefix)
+}
+
 // Account is one mailbox.
 type Account struct {
 	// ID is a short stable name ("perso"), used in URLs and the database.

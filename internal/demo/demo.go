@@ -43,7 +43,7 @@ type Server struct {
 // Start runs the servers on loopback ports.
 func Start() (*Server, error) {
 	s := &Server{user: imapmemserver.NewUser(Address, password)}
-	for _, name := range []string{"INBOX", "Archive", "Sent", "Drafts", "Trash", "Receipts"} {
+	for _, name := range []string{"INBOX", "Archive", "Sent", "Drafts", "Trash", "Junk", "Receipts", "Projects", "Projects/Robotics"} {
 		if err := s.user.Create(name, nil); err != nil {
 			return nil, err
 		}
@@ -203,6 +203,10 @@ func (s *Server) Seed(now time.Time) error {
 			"Hey! A few of us are going to the climbing gym on Saturday afternoon. Want to join?\n\nLéa"), []imap.Flag{imap.FlagFlagged}},
 		{"Drafts", plain(now.Add(-6*time.Hour), "Ben <"+Address+">", "Léa Dubois <lea@friends.test>", "Photos from the hike", "draft1@demo.test", "",
 			"Here are the photos from"), []imap.Flag{imap.FlagSeen, imap.FlagDraft}},
+		{"Projects/Robotics", plain(now.Add(-9*day), "Hugo Bernard <hugo@club.test>", Address, "Motor driver datasheet", "robot1@club.test", "",
+			"Hi Ben,\n\nHere is the reference of the motor driver we talked about: DRV8833.\n\nHugo"), nil},
+		{"Junk", plain(now.Add(-1*day), "Prize <win@spam.test>", Address, "You won!", "spam1@spam.test", "",
+			"Claim it now."), nil},
 		{"Trash", plain(now.Add(-4*day), "Deals <promo@shop.test>", Address, "Last chance: 70% off", "promo@shop.test", "",
 			"Everything must go."), []imap.Flag{imap.FlagSeen}},
 	}

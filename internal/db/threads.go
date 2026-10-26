@@ -10,8 +10,10 @@ import (
 // Filter selects the messages of a list: a folder of one or every account,
 // or the results of a search.
 type Filter struct {
-	Roles   []string // folders to look in
-	Account string   // "" for every account
+	Roles []string // folders to look in (every folder if empty)
+	// ExcludeRoles leaves out folders (the trash, for searches).
+	ExcludeRoles []string
+	Account      string // "" for every account
 	// Match is an FTS5 query on the subject, the people and the text.
 	Match       string
 	From        string
@@ -48,6 +50,12 @@ func (f *Filter) where() (string, []any) {
 	if len(f.Roles) > 0 {
 		conds = append(conds, `f.role IN (`+placeholders(len(f.Roles))+`)`)
 		for _, r := range f.Roles {
+			args = append(args, r)
+		}
+	}
+	if len(f.ExcludeRoles) > 0 {
+		conds = append(conds, `f.role NOT IN (`+placeholders(len(f.ExcludeRoles))+`)`)
+		for _, r := range f.ExcludeRoles {
 			args = append(args, r)
 		}
 	}

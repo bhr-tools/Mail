@@ -11,7 +11,6 @@ import { isTextInput } from './dom.js';
 
 // The digit row of an AZERTY keyboard, and of a QWERTY one.
 const ACCOUNT_KEYS = { '&': 0, 'é': 1, '"': 2, "'": 3, '(': 4, 1: 0, 2: 1, 3: 2, 4: 3, 5: 4 };
-const GO = { i: 'inbox', a: 'archive', s: 'sent', d: 'drafts', t: 'trash' };
 
 export function initKeys(app) {
   const updateMode = () => app.renderStatus();
@@ -45,9 +44,6 @@ export function initKeys(app) {
       if (e.key === 'g') {
         app.moveTo(0);
         e.preventDefault();
-      } else if (GO[e.key]) {
-        app.setView(GO[e.key], app.state.view.account);
-        e.preventDefault();
       }
       return;
     }
@@ -71,8 +67,10 @@ export function initKeys(app) {
       case 'j': case 'ArrowDown': app.move(1); return true;
       case 'k': case 'ArrowUp': app.move(-1); return true;
       case 'G': app.moveTo(app.state.threads.length - 1); return true;
-      case 'J': app.focusMessage(1); return true;
-      case 'K': app.focusMessage(-1); return true;
+      // As in aerc: folders, or the messages of an open conversation.
+      case 'J': if (app.state.reader) app.focusMessage(1); else app.moveFolder(1); return true;
+      case 'K': if (app.state.reader) app.focusMessage(-1); else app.moveFolder(-1); return true;
+      case '+': app.toggleCurrentSection(); return true;
       case 'l': case 'ArrowRight': app.openCursor(); return true;
       case 'Enter': app.enter(); return true;
       case 'h': case 'ArrowLeft': app.closeReader(); return true;

@@ -2,7 +2,8 @@
 
 A minimalist, self-hosted mail client in the spirit of Get Done, Focus and Calendar:
 
-- **Your accounts, one place:** Gmail (with an app password), any IMAP/SMTP server. Every inbox together, or one account at a time.
+- **Your accounts, one place:** Gmail (with an app password), any IMAP/SMTP server. Every inbox together, or one account at a time. Your own folders and Gmail labels are there too.
+- **Minimal sidebar:** each account folds to its inbox; unfold it to reach the other folders.
 - **Images, safely:** HTML mail is shown as designed, in a frame that runs no script and loads nothing from the internet. Remote images, which tell senders when you read, stay hidden until you press `i`, and then go through the server, so senders never see your address. Senders can be trusted for good.
 - **Done means archived:** `d` takes a conversation out of the inbox, `z` brings it back. Actions show at once and reach the server in the background.
 - **Conversations:** replies are grouped with the messages they answer, your own answers (from Sent) included. Quotes are folded.
@@ -21,8 +22,8 @@ Press `?` in the app to show the cheatsheet.
 | `j` / `k`, `gg` / `G` | Next / previous, first / last conversation (an open conversation follows) |
 | `l` or `Enter` | Open (`Enter` again folds or unfolds the message) |
 | `h` | Back to the list |
-| `J` / `K` | Next / previous message of the conversation |
-| `gi` `ga` `gs` `gd` `gt` | Inbox, archive, sent, drafts, trash |
+| `J` / `K` | Next / previous folder of the sidebar (in an open conversation: next / previous message), as in aerc |
+| `+` | Fold / unfold the account: inbox only, or every folder |
 | `&` `é` `"` `'` | Every inbox, then each account |
 | `d` | Done: archive |
 | `D` (or `#`) | Trash |
@@ -37,13 +38,13 @@ Press `?` in the app to show the cheatsheet.
 | `i` | Show the remote images |
 | `t` | Plain text / formatted |
 | `o` | Open an attachment |
-| `/` | Search: words, `from:`, `to:`, `is:unread`, `is:starred`, `has:attachment`, `in:archive`, `in:all`, `account:` |
+| `/` | Search: words, `from:`, `to:`, `is:unread`, `is:starred`, `has:attachment`, `in:archive`, `in:Receipts`, `in:all`, `account:` |
 | `Ctrl+Enter` / `Ctrl+S` | Send / save the draft (in the composer) |
 | `Esc` | Close (an unsent message is kept as a draft) |
 
 ## How it works
 
-The server keeps a copy of each account in SQLite: the inbox and drafts whole, the archive, sent mail and trash for the last year (`-window`). Older mail is found with **Search older mail on the servers** at the end of search results. One connection per account waits in IMAP IDLE on the inbox, so new mail shows within seconds; the other folders are checked every five minutes. Flags changed elsewhere (read on a phone) follow, with CONDSTORE when the server has it.
+The server keeps a copy of each account in SQLite: the inbox and drafts whole, the archive, sent mail, trash and your own folders for the last year (`-window`). Junk and Gmail's system folders (Important, Starred…) are left out. Older mail is found with **Search older mail on the servers** at the end of search results. One connection per account waits in IMAP IDLE on the inbox, so new mail shows within seconds; the other folders are checked every five minutes. Flags changed elsewhere (read on a phone) follow, with CONDSTORE when the server has it.
 
 Actions done in the app (done, trash, read, star, move) are applied to the local copy at once and queued for the server; a refused action is tried again, then undone with a message in the status bar. The folders of each role (inbox, archive, sent, drafts, trash) are found from the server's special-use attributes (Gmail's All Mail is the archive) or usual names, and can be set by hand.
 

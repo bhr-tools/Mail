@@ -87,8 +87,23 @@ func TestSyncFoldersThreadsAndBodies(t *testing.T) {
 	if len(threads(t, store, config.Drafts)) != 1 || len(threads(t, store, config.Trash)) != 1 || len(threads(t, store, config.Archive)) != 2 {
 		t.Error("drafts, trash or archive not synchronized")
 	}
-	if folders := a.Folders(); len(folders) != 6 {
+	if folders := a.Folders(); len(folders) != 9 {
 		t.Errorf("folders = %v", folders)
+	}
+	// The person's folders are kept too; junk is not.
+	var own []string
+	all, _ := store.Folders("demo")
+	for _, f := range all {
+		if config.IsCustom(f.Role) {
+			own = append(own, f.Name)
+		}
+	}
+	if len(own) != 3 || own[0] != "Receipts" && own[1] != "Receipts" && own[2] != "Receipts" {
+		t.Errorf("own folders = %v", own)
+	}
+	robotics := threads(t, store, config.CustomRole("Projects/Robotics"))
+	if len(robotics) != 1 || robotics[0].Latest.Subject != "Motor driver datasheet" || robotics[0].Unread != 1 {
+		t.Errorf("robotics = %+v", robotics)
 	}
 
 	// Recent inbox bodies were downloaded ahead, with their first line.

@@ -4,7 +4,7 @@ import { api, onUnauthorized } from './api.js';
 import { h, icon } from './dom.js';
 import { clock } from './format.js';
 import { closeAllModals, closePopover, openMenu, openModal, toast, topModal } from './ui/overlay.js';
-import { renderSidebar, ROLE_LABELS } from './views/sidebar.js';
+import { folderLabel, navigation, renderSidebar } from './views/sidebar.js';
 import { renderList, threadKey, updateRows } from './views/list.js';
 import { renderBody, renderReader, scrollToFocused } from './views/reader.js';
 import { openCompose } from './views/compose.js';
@@ -54,6 +54,8 @@ class App {
       reader: null,
       undo: null, // { ids, label }
     };
+    // Accounts showing every folder; the others show their inbox only.
+    this.expanded = new Set(readJSON(prefs.get('expanded', '[]')));
     this.listSeq = 0;
     this.watching = false;
     this.handleKey = () => {};
@@ -101,6 +103,10 @@ class App {
     if (!this.state.version) this.state.version = data.version;
     const { view } = this.state;
     if (view.account && !this.accountOf(view.account)) view.account = '';
+    // A folder gone from the server (a label deleted elsewhere).
+    if (view.role.startsWith('folder:') && !this.state.accounts.some((a) => a.folders.some((f) => f.role === view.role))) {
+      view.role = 'inbox';
+    }
     if (this.state.accounts.length === 1) view.account = '';
     renderSidebar(this);
     this.renderTitle();
@@ -187,6 +193,34 @@ class App {
     this.watching = false;
   }
 
+  isExpanded(id) {
+    return this.expanded.has(id);
+  }
+
+  toggleExpanded(id) {
+    if (this.expanded.has(id)) this.expanded.delete(id);
+    else this.expanded.add(id);
+    prefs.set('expanded', JSON.stringify([...this.expanded]));
+    renderSidebar(this);
+  }
+
+  /** +: folds or unfolds the account of the folder being viewed. */
+  toggleCurrentSection() {
+    const { view, accounts } = this.state;
+    const id = view.account || (accounts.length === 1 ? accounts[0].id : '');
+    if (id) this.toggleExpanded(id);
+  }
+
+  /** Shift+J / Shift+K: next or previous folder of the sidebar. */
+  moveFolder(step) {
+    const list = navigation(this);
+    if (!list.length) return;
+    const { view, search } = this.state;
+    const i = search ? -1 : list.findIndex((f) => f.role === view.role && f.account === view.account);
+    const next = list[Math.max(0, Math.min(list.length - 1, i + step))];
+    if (next && (search || next.role !== view.role || next.account !== view.account)) this.setView(next.role, next.account);
+  }
+
   accountOf(id) {
     return this.state.accounts.find((a) => a.id === id);
   }
@@ -217,9 +251,9 @@ class App {
     } else {
       const account = this.accountOf(view.account);
       const suffix = accounts.length > 1 ? (account ? account.name : 'All accounts') : '';
-      title.replaceChildren(ROLE_LABELS[view.role], suffix ? h('span', { class: 'muted' }, ` · ${suffix}`) : '');
+      title.replaceChildren(folderLabel(view.role), suffix ? h('span', { class: 'muted' }, ` · ${suffix}`) : '');
     }
-    document.title = `${search ? 'Search' : ROLE_LABELS[view.role]} · Mail`;
+    document.title = `${search ? 'Search' : folderLabel(view.role)} · Mail`;
   }
 
   renderStatus(mode) {
@@ -276,7 +310,9 @@ class App {
     if (accounts.length < 2) return;
     const account = index === 0 ? '' : accounts[index - 1]?.id;
     if (account === undefined) return;
-    this.setView(this.state.search ? 'inbox' : this.state.view.role, account);
+    // Another account has other folders of its own.
+    const { role } = this.state.view;
+    this.setView(this.state.search || role.startsWith('folder:') ? 'inbox' : role, account);
   }
 
   setCursor(index) {
@@ -772,14 +808,11 @@ class App {
           row(['G'], 'Last conversation'),
           row(['l', 'Enter'], 'Open'),
           row(['h'], 'Back to the list'),
-          row(['J', 'K'], 'Next / previous message'),
           row(['/'], 'Search'),
           h('h3', { class: 'field-label' }, 'Folders'),
-          row(['g', 'i'], 'Inbox'),
-          row(['g', 'a'], 'Archive'),
-          row(['g', 's'], 'Sent'),
-          row(['g', 'd'], 'Drafts'),
-          row(['g', 't'], 'Trash'),
+          row(['J', 'K'], 'Next / previous folder'),
+          row(['J', 'K'], 'In a conversation: next / previous message'),
+          row(['+'], 'Fold / unfold the account'),
           row(['&', 'é', '"', "'"], 'All inboxes, then each account')),
         h('section', null,
           h('h3', { class: 'field-label' }, 'Act'),
@@ -992,6 +1025,14 @@ class App {
         { label: 'Lock', icon: 'lock', run: () => this.lock() },
       ]),
     ], { title: 'Settings' }));
+  }
+}
+
+function readJSON(text) {
+  try {
+    return JSON.parse(text) || [];
+  } catch {
+    return [];
   }
 }
 
