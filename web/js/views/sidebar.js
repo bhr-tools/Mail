@@ -54,6 +54,11 @@ export function navigation(app) {
 }
 
 export function renderSidebar(app) {
+  // Not under the pointer while an account is being dragged: after the drop.
+  if (drag) {
+    drag.stale = true;
+    return;
+  }
   const { accounts, view, search } = app.state;
   const several = accounts.length > 1;
   const nav = document.getElementById('folders');
@@ -97,12 +102,96 @@ function sectionHeader(app, a) {
   return h('button', {
     type: 'button',
     class: ['nav-section', `acc-${app.colorOf(a.id)}`, open && 'open'],
-    title: open ? 'Fold: inbox only (+)' : 'Show every folder (+)',
-    attrs: { 'aria-expanded': String(open) },
-    onclick: () => app.toggleExpanded(a.id),
+    title: `${open ? 'Fold: inbox only' : 'Show every folder'} (+) · drag to reorder`,
+    attrs: { 'aria-expanded': String(open), 'data-account': a.id },
+    onclick: () => {
+      if (dropped) return;
+      app.toggleExpanded(a.id);
+    },
+    onpointerdown: (e) => startDrag(app, e, a.id),
   },
   h('span', { class: 'account-dot' }),
   h('span', { class: 'nav-section-name' }, a.name),
   a.status.state === 'error' ? h('span', { class: 'sync-error', title: a.status.error }, '!') : null,
   icon('chevronRight', 'nav-chevron'));
+}
+
+// Reordering the accounts: an account header is dragged (mouse or finger)
+// above or below the others. The rows of the sidebar stay where they are; a
+// line shows where the account will go.
+
+let drag = null;
+let dropped = false; // swallows the click that ends a drag
+
+function sections(nav) {
+  // Each account's header and the rows under it, in order.
+  const out = [];
+  for (const row of nav.children) {
+    if (row.dataset.account) out.push({ id: row.dataset.account, header: row, last: row });
+    else if (out.length) out[out.length - 1].last = row;
+  }
+  return out;
+}
+
+function startDrag(app, e, id) {
+  if (e.button !== 0 || app.state.accounts.length < 2) return;
+  const nav = document.getElementById('folders');
+  const header = e.currentTarget;
+  const startY = e.clientY;
+  let index = -1;
+  let moving = false;
+  // The sidebar holds still from the press: a redraw would replace the header.
+  drag = { stale: false };
+
+  const mark = () => {
+    nav.querySelectorAll('.drop-before, .drop-after').forEach((el) => el.classList.remove('drop-before', 'drop-after'));
+    const list = sections(nav);
+    if (index < list.length) list[index].header.classList.add('drop-before');
+    else list[list.length - 1].last.classList.add('drop-after');
+  };
+  const move = (ev) => {
+    if (ev.pointerId !== e.pointerId) return;
+    if (!moving) {
+      if (Math.abs(ev.clientY - startY) < 6) return;
+      moving = true;
+      header.classList.add('dragging');
+      nav.classList.add('reordering');
+    }
+    ev.preventDefault();
+    // The new place: before the first account whose middle is below the pointer.
+    const list = sections(nav);
+    index = list.length;
+    for (let i = 0; i < list.length; i++) {
+      const top = list[i].header.getBoundingClientRect().top;
+      const bottom = list[i].last.getBoundingClientRect().bottom;
+      if (ev.clientY < (top + bottom) / 2) {
+        index = i;
+        break;
+      }
+    }
+    mark();
+  };
+  const end = (ev) => {
+    if (ev.pointerId !== e.pointerId) return;
+    window.removeEventListener('pointermove', move);
+    window.removeEventListener('pointerup', end);
+    window.removeEventListener('pointercancel', end);
+    const stale = drag.stale;
+    drag = null;
+    if (!moving) {
+      // After the click this press makes, which needs the header in place.
+      if (stale) setTimeout(() => renderSidebar(app));
+      return;
+    }
+    dropped = true;
+    setTimeout(() => { dropped = false; });
+    nav.classList.remove('reordering');
+    const from = sections(nav).findIndex((s) => s.id === id);
+    // The account leaves its place: the places after it move up by one.
+    if (ev.type === 'pointerup' && index !== from && index !== from + 1) app.moveAccount(id, index > from ? index - 1 : index);
+    else renderSidebar(app);
+  };
+  window.addEventListener('pointermove', move);
+  window.addEventListener('pointerup', end);
+  window.addEventListener('pointercancel', end);
 }

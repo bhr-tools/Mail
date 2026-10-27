@@ -1,7 +1,7 @@
-// Package demo runs an IMAP and an SMTP server in memory, filled with sample
+// Package testmail runs an IMAP and an SMTP server in memory, filled with sample
 // mail, so the app can be tried and tested without a real account. Mail sent
 // to the demo address lands in its inbox.
-package demo
+package testmail
 
 import (
 	"bytes"
@@ -28,12 +28,12 @@ const (
 	password = "demo"
 )
 
-// Server is a running demo.
+// Server is a running pair of mail servers in memory.
 type Server struct {
 	user     *imapmemserver.User
 	imapAddr string
 	smtpAddr string
-	// ImageURL is a remote image served by the demo, for newsletters.
+	// ImageURL is a remote image served locally, for newsletters.
 	ImageURL string
 
 	mu   sync.Mutex
@@ -90,7 +90,7 @@ const banner = `<svg xmlns="http://www.w3.org/2000/svg" width="560" height="120"
 	`<rect width="560" height="120" rx="12" fill="#286983"/>` +
 	`<text x="32" y="72" font-family="sans-serif" font-size="34" fill="#faf4ed">Autumn reading list</text></svg>`
 
-// Account returns the settings of the demo account.
+// Account returns the settings of the sample account.
 func (s *Server) Account(id, name string) *config.Account {
 	host, port, _ := net.SplitHostPort(s.imapAddr)
 	smtpHost, smtpPort, _ := net.SplitHostPort(s.smtpAddr)

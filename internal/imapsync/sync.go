@@ -266,7 +266,7 @@ func (a *Account) idle(ctx context.Context) error {
 		default:
 		}
 	}
-	c, err := dial(a.cfg, &imapclient.UnilateralDataHandler{
+	c, err := dial(a.cfg, a.refused, &imapclient.UnilateralDataHandler{
 		Expunge: func(uint32) { signal() },
 		Mailbox: func(data *imapclient.UnilateralDataMailbox) {
 			if data.NumMessages != nil {

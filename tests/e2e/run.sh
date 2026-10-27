@@ -1,5 +1,5 @@
 #!/bin/sh
-# Runs the browser tests against a throwaway demo instance of the current
+# Runs the browser tests against a throwaway instance of the current
 # code (sample mail served from memory). Python, Playwright and Chromium come
 # from nixpkgs. Screenshots go to tests/e2e/out.
 set -eu
@@ -8,8 +8,8 @@ mkdir -p tests/e2e/out
 tmp=$(mktemp -d)
 trap 'kill $pid 2>/dev/null || true; rm -rf "$tmp"' EXIT
 
-go build -o "$tmp/mail" ./cmd/server
-"$tmp/mail" -demo -port 18090 -data-dir "$tmp/data" >"$tmp/server.log" 2>&1 &
+go build -tags e2e -o "$tmp/mail" ./cmd/server
+"$tmp/mail" -port 18090 -data-dir "$tmp/data" >"$tmp/server.log" 2>&1 &
 pid=$!
 sleep 1
 

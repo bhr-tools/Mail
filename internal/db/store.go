@@ -218,6 +218,12 @@ var migrations = []string{
 		token TEXT PRIMARY KEY,
 		created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 	);`,
+
+	// The order of the accounts, as arranged in the sidebar.
+	`CREATE TABLE account_order (
+		account TEXT PRIMARY KEY,
+		position INTEGER NOT NULL
+	);`,
 }
 
 func (s *Store) migrate() error {

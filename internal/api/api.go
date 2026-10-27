@@ -55,6 +55,7 @@ func (a *API) Handler() http.Handler {
 	auth("POST /api/auth/change-password", a.authChangePassword)
 
 	auth("GET /api/accounts", a.accounts)
+	auth("PUT /api/accounts/order", a.setAccountOrder)
 	auth("GET /api/accounts/{account}/folders", a.folders)
 	auth("POST /api/accounts/{account}/sync", a.syncAccount)
 	auth("GET /api/changes", a.changes)

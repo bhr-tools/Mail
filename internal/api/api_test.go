@@ -13,14 +13,14 @@ import (
 
 	"github.com/bhr-tools/mail/internal/config"
 	"github.com/bhr-tools/mail/internal/db"
-	"github.com/bhr-tools/mail/internal/demo"
 	"github.com/bhr-tools/mail/internal/imapsync"
 	"github.com/bhr-tools/mail/internal/imgproxy"
+	"github.com/bhr-tools/mail/internal/testmail"
 )
 
 func setup(t *testing.T) (*httptest.Server, *db.Store) {
 	t.Helper()
-	srv, err := demo.Start()
+	srv, err := testmail.Start()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -133,4 +133,19 @@ func TestQuery(t *testing.T) {
 func itoa(n int64) string {
 	b, _ := json.Marshal(n)
 	return string(b)
+}
+
+func TestAccountOrder(t *testing.T) {
+	srv, _ := setup(t)
+	req, _ := http.NewRequest("PUT", srv.URL+"/api/accounts/order", strings.NewReader(`{"accounts":["nope"]}`))
+	req.Header.Set("Content-Type", "application/json")
+	res, err := http.DefaultClient.Do(req)
+	if err != nil || res.StatusCode != http.StatusBadRequest {
+		t.Fatalf("unknown account: %v %v", res, err)
+	}
+	req, _ = http.NewRequest("PUT", srv.URL+"/api/accounts/order", strings.NewReader(`{"accounts":["demo"]}`))
+	req.Header.Set("Content-Type", "application/json")
+	if res, err := http.DefaultClient.Do(req); err != nil || res.StatusCode != http.StatusNoContent {
+		t.Fatalf("order: %v %v", res, err)
+	}
 }

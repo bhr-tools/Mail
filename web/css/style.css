@@ -388,6 +388,12 @@ select.input { cursor: pointer; }
   text-transform: uppercase;
 }
 .nav-section:hover { background: var(--rp-overlay); color: var(--rp-subtle); }
+/* Reordering accounts: the dragged header, and a line where it will go. */
+.nav-section { touch-action: pan-x; }
+.nav-section.dragging { background: var(--rp-overlay); color: var(--rp-text); cursor: grabbing; }
+#folders.reordering { cursor: grabbing; user-select: none; }
+#folders .drop-before { box-shadow: 0 -2px 0 var(--rp-iris); }
+#folders .drop-after { box-shadow: 0 2px 0 var(--rp-iris); }
 .nav-section-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .nav-chevron { transition: transform 0.15s; }
 .nav-section.open .nav-chevron { transform: rotate(90deg); }

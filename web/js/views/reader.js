@@ -156,7 +156,7 @@ export function renderReader(app) {
   const unread = r.messages.some((m) => !m.seen);
   const role = r.view;
   const header = h('header', { class: 'reader-header' },
-    h('button', { type: 'button', class: 'icon-button back-button', title: 'Back (h)', onclick: () => app.closeReader() }, icon('arrowLeft')),
+    h('button', { type: 'button', class: 'icon-button back-button', title: 'Back', onclick: () => app.closeReader() }, icon('arrowLeft')),
     h('h2', { class: 'reader-subject' }, r.subject || '(no subject)'),
     h('div', { class: 'reader-actions' },
       role === 'inbox' ? actionButton('Done', 'done', 'd', () => app.act('done')) : actionButton('Move to inbox', 'inbox', 'I', () => app.act('inbox')),

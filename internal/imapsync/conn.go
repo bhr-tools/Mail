@@ -24,10 +24,45 @@ const dialTimeout = 20 * time.Second
 
 var wordDecoder = &mime.WordDecoder{CharsetReader: gomessage.CharsetReader}
 
+// refusedRetry is how long a refused password rests before it is tried
+// again: servers lock accounts (or ask for a captcha) after repeated
+// failures, and the three connections of an account would otherwise try it
+// every few minutes.
+const refusedRetry = time.Hour
+
+// refusals remembers the last password the server refused.
+type refusals struct {
+	mu       sync.Mutex
+	password string
+	until    time.Time
+	err      error
+}
+
+// check returns the refusal of password, if it is still resting.
+func (r *refusals) check(password string) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if r.err != nil && r.password == password && time.Now().Before(r.until) {
+		return r.err
+	}
+	return nil
+}
+
+func (r *refusals) note(password string, err error) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.password, r.until = password, time.Now().Add(refusedRetry)
+	r.err = fmt.Errorf("%w; check the password, not tried again before %s", err, r.until.Format("15:04"))
+	return r.err
+}
+
 // dial opens an authenticated connection.
-func dial(a *config.Account, handler *imapclient.UnilateralDataHandler) (*imapclient.Client, error) {
+func dial(a *config.Account, refused *refusals, handler *imapclient.UnilateralDataHandler) (*imapclient.Client, error) {
 	password, err := a.ReadPassword()
 	if err != nil {
+		return nil, err
+	}
+	if err := refused.check(password); err != nil {
 		return nil, err
 	}
 	options := &imapclient.Options{
@@ -52,7 +87,7 @@ func dial(a *config.Account, handler *imapclient.UnilateralDataHandler) (*imapcl
 		c.Close()
 		var imapErr *imap.Error
 		if errors.As(err, &imapErr) {
-			return nil, fmt.Errorf("login refused by %s: %s", a.IMAP.Host, imapErr.Text)
+			return nil, refused.note(password, fmt.Errorf("login refused by %s: %s", a.IMAP.Host, imapErr.Text))
 		}
 		return nil, fmt.Errorf("login: %w", err)
 	}
@@ -63,6 +98,7 @@ func dial(a *config.Account, handler *imapclient.UnilateralDataHandler) (*imapcl
 // on it are serialized.
 type conn struct {
 	account *config.Account
+	refused *refusals
 	mu      sync.Mutex
 	client  *imapclient.Client
 }
@@ -73,7 +109,7 @@ func (c *conn) with(fn func(*imapclient.Client) error) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	if c.client == nil {
-		client, err := dial(c.account, nil)
+		client, err := dial(c.account, c.refused, nil)
 		if err != nil {
 			return err
 		}

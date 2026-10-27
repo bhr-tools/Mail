@@ -12,6 +12,10 @@ import { initKeys } from './keys.js';
 
 const COLORS = ['pine', 'rose', 'iris', 'gold', 'foam', 'love'];
 const PAGE = 50;
+// The reader sits beside the list above the phone layout (style.css).
+const WIDE = window.matchMedia('(min-width: 769px)');
+// How long a conversation shown by j / k stays before it counts as read.
+const READ_AFTER = 1000;
 const $ = (id) => document.getElementById(id);
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -145,6 +149,7 @@ class App {
     }
     renderList(this);
     this.renderStatus();
+    this.follow();
   }
 
   async loadMore() {
@@ -195,6 +200,23 @@ class App {
 
   isExpanded(id) {
     return this.expanded.has(id);
+  }
+
+  /** Moves an account to position index of the sidebar, for good. */
+  async moveAccount(id, index) {
+    const accounts = this.state.accounts.filter((a) => a.id !== id);
+    const moved = this.accountOf(id);
+    if (!moved) return;
+    accounts.splice(index, 0, moved);
+    if (accounts.every((a, i) => a === this.state.accounts[i])) return;
+    this.state.accounts = accounts;
+    renderSidebar(this);
+    try {
+      await api.setAccountOrder(accounts.map((a) => a.id));
+    } catch (err) {
+      toast(err.message, { type: 'error' });
+      await this.loadAccounts().catch(() => {});
+    }
   }
 
   toggleExpanded(id) {
@@ -322,19 +344,39 @@ class App {
     updateRows(this);
     this.renderStatus();
     if (this.state.more && this.state.cursor >= n - 5) this.loadMore();
+    this.follow();
+  }
+
+  /** Whether the reader sits beside the list (not on a phone). */
+  wide() {
+    return WIDE.matches;
+  }
+
+  /**
+   * Beside the list, the reader always shows the conversation under the
+   * cursor (a draft too: Enter or e finishes it).
+   */
+  follow() {
+    if (!this.wide()) return;
+    const t = this.cursorThread();
+    if (!t) {
+      if (!this.state.loading) this.closeReader();
+      return;
+    }
+    if (this.state.open !== threadKey(t)) this.openThread(t);
   }
 
   /** j / k: next or previous conversation; an open reader follows. */
   move(step) {
     const reading = this.state.reader && this.state.open === this.cursorKey();
     this.setCursor(this.state.cursor + step);
-    if (reading) this.openCursor();
+    if (reading && !this.wide()) this.openCursor();
   }
 
   moveTo(index) {
     const reading = this.state.reader && this.state.open === this.cursorKey();
     this.setCursor(index);
-    if (reading) this.openCursor();
+    if (reading && !this.wide()) this.openCursor();
   }
 
   cursorThread() {
@@ -349,23 +391,17 @@ class App {
   openCursor() {
     const t = this.cursorThread();
     if (!t) return;
-    if (this.state.open === threadKey(t)) return;
     // A draft opens where it can be finished.
     if (this.roleOf(t) === 'drafts' && t.count === 1) {
       this.editDraft(t.latest.id);
       return;
     }
+    if (this.state.open === threadKey(t)) return;
     this.openThread(t);
   }
 
-  /** Enter: opens the conversation, or folds / unfolds the focused message. */
+  /** Enter: opens the conversation (on a phone), or finishes a draft. */
   enter() {
-    const r = this.state.reader;
-    if (r && this.state.open === this.cursorKey()) {
-      const m = r.messages[r.focused];
-      if (m) this.toggleMessage(m.id);
-      return;
-    }
     this.openCursor();
   }
 
@@ -393,18 +429,22 @@ class App {
     r.subject = data.subject;
     r.messages = data.messages;
     const last = r.messages.length - 1;
-    for (const m of r.messages) if (!m.seen) r.expanded.add(m.id);
-    r.expanded.add(r.messages[last].id);
+    // Every message unfolded; the reading starts at the first unread.
+    for (const m of r.messages) r.expanded.add(m.id);
     const firstUnread = r.messages.findIndex((m) => !m.seen);
     r.focused = firstUnread >= 0 ? firstUnread : last;
     renderReader(this);
     if (r.messages.length > 1) scrollToFocused(this);
-    // Opening a conversation reads it.
-    if (t.unread > 0) {
+    // Opening a conversation reads it. Beside the list, where j / k show
+    // each conversation passed over, once it has stayed a moment.
+    const read = () => {
+      if (!(t.unread > 0) || this.state.open !== key) return;
       t.unread = 0;
       updateRows(this);
       api.act('read', view, { threads: [{ account: t.account, thread: t.thread }] }).catch((err) => toast(err.message, { type: 'error' }));
-    }
+    };
+    if (this.wide()) setTimeout(read, READ_AFTER);
+    else read();
   }
 
   async refreshReader() {
@@ -439,16 +479,6 @@ class App {
     renderReader(this);
   }
 
-  /** J / K: next or previous message of the conversation. */
-  focusMessage(step) {
-    const r = this.state.reader;
-    if (!r?.messages.length) return;
-    r.focused = Math.max(0, Math.min(r.messages.length - 1, r.focused + step));
-    r.expanded.add(r.messages[r.focused].id);
-    renderReader(this);
-    scrollToFocused(this);
-  }
-
   focusedMessage() {
     const r = this.state.reader;
     return r?.messages[r.focused] || null;
@@ -464,7 +494,7 @@ class App {
       this.state.selected.clear();
       updateRows(this);
       this.renderStatus();
-    } else if (this.state.reader) {
+    } else if (this.state.reader && !this.wide()) {
       this.closeReader();
     } else if (this.state.search) {
       this.closeSearch();
@@ -523,8 +553,9 @@ class App {
         }
         if (action === 'star' || action === 'unstar') {
           const last = r.messages[r.messages.length - 1];
-          if (action === 'star') last.flagged = true;
-          else for (const m of r.messages) m.flagged = false;
+          // The messages may still be loading.
+          if (action === 'unstar') for (const m of r.messages) m.flagged = false;
+          else if (last) last.flagged = true;
         }
         renderReader(this);
       }
@@ -582,6 +613,7 @@ class App {
       if (nextThread) this.openThread(nextThread);
       else this.closeReader();
     }
+    this.follow();
     this.renderStatus();
   }
 
@@ -803,15 +835,13 @@ class App {
       body: h('div', { class: 'help-grid' },
         h('section', null,
           h('h3', { class: 'field-label' }, 'Move'),
-          row(['j', 'k'], 'Next / previous conversation'),
+          row(['j', 'k'], 'Next / previous conversation (shown beside)'),
           row(['g', 'g'], 'First conversation'),
           row(['G'], 'Last conversation'),
-          row(['l', 'Enter'], 'Open'),
-          row(['h'], 'Back to the list'),
+          row(['Ctrl', 'd'], 'Scroll the conversation down (Ctrl u: up)'),
           row(['/'], 'Search'),
           h('h3', { class: 'field-label' }, 'Folders'),
           row(['J', 'K'], 'Next / previous folder'),
-          row(['J', 'K'], 'In a conversation: next / previous message'),
           row(['+'], 'Fold / unfold the account'),
           row(['&', 'é', '"', "'"], 'All inboxes, then each account')),
         h('section', null,
@@ -1112,4 +1142,5 @@ function pickFolder(loading) {
 }
 
 const app = new App();
+WIDE.addEventListener('change', () => app.follow());
 window.addEventListener('DOMContentLoaded', () => app.start());

@@ -3,6 +3,8 @@ package imapsync
 import (
 	"context"
 	"path/filepath"
+	"slices"
+	"strings"
 	"testing"
 	"time"
 
@@ -10,12 +12,12 @@ import (
 
 	"github.com/bhr-tools/mail/internal/config"
 	"github.com/bhr-tools/mail/internal/db"
-	"github.com/bhr-tools/mail/internal/demo"
+	"github.com/bhr-tools/mail/internal/testmail"
 )
 
-func setup(t *testing.T) (*db.Store, *Account, *demo.Server) {
+func setup(t *testing.T) (*db.Store, *Account, *testmail.Server) {
 	t.Helper()
-	srv, err := demo.Start()
+	srv, err := testmail.Start()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -170,7 +172,7 @@ func TestActionsReachTheServer(t *testing.T) {
 	}
 
 	// New mail delivered on the server shows after a sync.
-	srv.Deliver("INBOX", []byte("From: x@y.test\r\nTo: "+demo.Address+"\r\nSubject: Hello\r\nMessage-ID: <new@y.test>\r\n\r\nHi\r\n"), imap.FlagSeen)
+	srv.Deliver("INBOX", []byte("From: x@y.test\r\nTo: "+testmail.Address+"\r\nSubject: Hello\r\nMessage-ID: <new@y.test>\r\n\r\nHi\r\n"), imap.FlagSeen)
 	a.Wake(config.Inbox)
 	syncNow(t, a)
 	if find(threads(t, store, config.Inbox), "Hello") == nil {
@@ -198,5 +200,41 @@ func TestIdleWakesTheSynchronization(t *testing.T) {
 	syncNow(t, a)
 	if find(threads(t, store, config.Inbox), "Ping") == nil {
 		t.Fatal("not synchronized")
+	}
+}
+
+func TestRefusedPasswordRests(t *testing.T) {
+	srv, err := testmail.Start()
+	if err != nil {
+		t.Fatal(err)
+	}
+	cfg := srv.Account("demo", "Demo")
+	cfg.Password = "wrong"
+	refused := &refusals{}
+	if _, err := dial(cfg, refused, nil); err == nil || !strings.Contains(err.Error(), "login refused") {
+		t.Fatalf("wrong password: %v", err)
+	}
+	// Not sent again: the refusal is returned without a new login.
+	if refused.check("wrong") == nil {
+		t.Error("refused password tried again at once")
+	}
+	cfg.Password = srv.Account("demo", "Demo").Password
+	c, err := dial(cfg, refused, nil)
+	if err != nil {
+		t.Fatalf("new password: %v", err)
+	}
+	c.Close()
+}
+
+func TestMissingFolderSetByHandIsCreated(t *testing.T) {
+	store, a, _ := setup(t)
+	a.cfg.Folders = map[string]string{config.Archive: "Kept"}
+	syncNow(t, a)
+	f, err := store.FolderByRole(a.cfg.ID, config.Archive)
+	if err != nil || f.Name != "Kept" {
+		t.Fatalf("archive = %+v, %v", f, err)
+	}
+	if !slices.Contains(a.Folders(), "Kept") {
+		t.Errorf("folders = %v", a.Folders())
 	}
 }

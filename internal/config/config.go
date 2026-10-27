@@ -16,7 +16,7 @@ import (
 const (
 	TLS      = "tls"      // implicit TLS (IMAP 993, SMTP 465)
 	StartTLS = "starttls" // plain connection upgraded with STARTTLS (SMTP 587)
-	Insecure = "none"     // plain text: tests and the demo only
+	Insecure = "none"     // plain text: tests only
 )
 
 // Server is an IMAP or SMTP endpoint.
@@ -68,7 +68,7 @@ type Account struct {
 	Username string `json:"username"`
 	// PasswordFile holds the password (an app password for Gmail).
 	PasswordFile string `json:"password_file"`
-	// Password is set directly by the demo and tests only.
+	// Password is set directly by tests only.
 	Password string `json:"-"`
 	IMAP     Server `json:"imap"`
 	SMTP     Server `json:"smtp"`

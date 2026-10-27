@@ -22,11 +22,14 @@ import (
 	"github.com/bhr-tools/mail/internal/api"
 	"github.com/bhr-tools/mail/internal/config"
 	"github.com/bhr-tools/mail/internal/db"
-	"github.com/bhr-tools/mail/internal/demo"
 	"github.com/bhr-tools/mail/internal/imapsync"
 	"github.com/bhr-tools/mail/internal/imgproxy"
 	"github.com/bhr-tools/mail/web"
 )
+
+// sampleAccounts serves sample mail from servers in memory, without a real
+// account. It is only built for the browser tests (go build -tags e2e).
+var sampleAccounts func() ([]*config.Account, error)
 
 // Each flag defaults to its environment variable, so the binary is configured
 // with flags (NixOS module) or environment (container) alike.
@@ -38,7 +41,6 @@ func main() {
 	accountsPath := flag.String("accounts", os.Getenv("ACCOUNTS"), "accounts file, JSON (env ACCOUNTS)")
 	noAuth := flag.Bool("no-auth", envBool("NO_AUTH"), "disable the master password (env NO_AUTH=true)")
 	window := flag.Duration("window", envDuration("WINDOW", 365*24*time.Hour), "how far back the archive, sent mail and trash are copied (env WINDOW)")
-	demoMode := flag.Bool("demo", envBool("DEMO"), "serve sample mail from servers in memory, without a real account (env DEMO=true)")
 	flag.Parse()
 
 	if *port < 1 || *port > 65535 {
@@ -51,23 +53,19 @@ func main() {
 
 	var accounts []*config.Account
 	switch {
-	case *demoMode:
-		srv, err := demo.Start()
-		if err != nil {
-			log.Fatalf("demo: %v", err)
-		}
-		if err := srv.Seed(time.Now()); err != nil {
-			log.Fatalf("demo: %v", err)
-		}
-		accounts = []*config.Account{srv.Account("demo", "Demo")}
 	case *accountsPath != "":
 		cfg, err := config.Load(*accountsPath)
 		if err != nil {
 			log.Fatalf("accounts: %v", err)
 		}
 		accounts = cfg.Accounts
+	case sampleAccounts != nil:
+		var err error
+		if accounts, err = sampleAccounts(); err != nil {
+			log.Fatalf("sample mail: %v", err)
+		}
 	default:
-		log.Fatal("no accounts: pass -accounts accounts.json (or -demo to try the app)")
+		log.Fatal("no accounts: pass -accounts accounts.json")
 	}
 
 	store, err := db.Open(path)
@@ -84,7 +82,7 @@ func main() {
 	addr := net.JoinHostPort(*host, strconv.Itoa(*port))
 	server := &http.Server{
 		Addr:              addr,
-		Handler:           newHandler(store, api.New(store, manager, imgproxy.New(*demoMode), *noAuth)),
+		Handler:           newHandler(store, api.New(store, manager, imgproxy.New(sampleAccounts != nil), *noAuth)),
 		ReadHeaderTimeout: 10 * time.Second,
 		ReadTimeout:       2 * time.Minute, // attachments
 		WriteTimeout:      2 * time.Minute,

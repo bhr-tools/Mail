@@ -3,10 +3,10 @@
 A minimalist, self-hosted mail client in the spirit of Get Done, Focus and Calendar:
 
 - **Your accounts, one place:** Gmail (with an app password), any IMAP/SMTP server. Every inbox together, or one account at a time. Your own folders and Gmail labels are there too.
-- **Minimal sidebar:** each account folds to its inbox; unfold it to reach the other folders.
+- **Minimal sidebar:** each account folds to its inbox; unfold it to reach the other folders. Drag an account by its name to reorder the accounts (kept on the server, so every device shows the same order).
 - **Images, safely:** HTML mail is shown as designed, in a frame that runs no script and loads nothing from the internet. Remote images, which tell senders when you read, stay hidden until you press `i`, and then go through the server, so senders never see your address. Senders can be trusted for good.
 - **Done means archived:** `d` takes a conversation out of the inbox, `z` brings it back. Actions show at once and reach the server in the background.
-- **Conversations:** replies are grouped with the messages they answer, your own answers (from Sent) included. Quotes are folded.
+- **Conversations:** the reader always shows the conversation under the cursor, every message unfolded; replies are grouped with the messages they answer, your own answers (from Sent) included. Quotes are folded. A conversation counts as read once it has been shown a second.
 - **Plain text writing:** reply, reply all, forward (with the attachments), drafts kept on the server, addresses completed from the people you write to. A missing attachment is caught before sending.
 - **Full Vim navigation:** fully operable from the keyboard, AZERTY included.
 - **Quiet:** no notification, no badge, no tracking. New mail shows when you look.
@@ -19,10 +19,9 @@ Press `?` in the app to show the cheatsheet.
 
 | Key | Action |
 |---|---|
-| `j` / `k`, `gg` / `G` | Next / previous, first / last conversation (an open conversation follows) |
-| `l` or `Enter` | Open (`Enter` again folds or unfolds the message) |
-| `h` | Back to the list |
-| `J` / `K` | Next / previous folder of the sidebar (in an open conversation: next / previous message), as in aerc |
+| `j` / `k`, `gg` / `G` | Next / previous, first / last conversation, shown beside the list (on a phone, tap to open) |
+| `Ctrl+d` / `Ctrl+u` | Scroll the conversation down / up |
+| `J` / `K` | Next / previous folder of the sidebar, as in aerc |
 | `+` | Fold / unfold the account: inbox only, or every folder |
 | `&` `é` `"` `'` | Every inbox, then each account |
 | `d` | Done: archive |
@@ -106,12 +105,11 @@ Options of an instance: `port`, `host` (127.0.0.1), `dataDir`, `dbPath`, `window
 
 ```sh
 nix develop
-go run ./cmd/server -demo -no-auth -port 8080   # sample mail, from servers in memory
 go test ./...
-tests/e2e/run.sh                                # browser test (Playwright, from nixpkgs)
+tests/e2e/run.sh   # browser test (Playwright, from nixpkgs)
 ```
 
-`-demo` runs an IMAP and an SMTP server in memory, filled with sample mail: everything works without a real account, sending included (mail to `ben@demo.test` lands in the inbox).
+The tests run against an IMAP and an SMTP server in memory, filled with sample mail (`internal/testmail`); the browser tests use a build of the server made for them (`-tags e2e`), never the deployed one.
 
 ## aerc (until the switch)
 

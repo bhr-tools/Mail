@@ -31,7 +31,7 @@ type Proxy struct {
 var ErrForbidden = errors.New("address not allowed")
 
 // New returns a proxy. allowPrivate lets it reach loopback and private
-// addresses (the demo serves its images locally).
+// addresses (the browser tests serve their images locally).
 func New(allowPrivate bool) *Proxy {
 	dialer := &net.Dialer{
 		Timeout: 10 * time.Second,

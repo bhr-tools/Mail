@@ -36,6 +36,13 @@ export function initKeys(app) {
       }
     }
     if (topModal() || isPopoverOpen() || isTextInput(e.target)) return;
+    if (e.ctrlKey && !e.metaKey && !e.altKey && (e.key === 'd' || e.key === 'u')) {
+      // Half a page down / up in the conversation, as in Vim.
+      const reader = document.getElementById('reader');
+      reader.scrollBy({ top: (e.key === 'd' ? 1 : -1) * reader.clientHeight / 2 });
+      e.preventDefault();
+      return;
+    }
     if (e.ctrlKey || e.metaKey || e.altKey) return;
 
     if (prefix === 'g') {
@@ -68,12 +75,10 @@ export function initKeys(app) {
       case 'k': case 'ArrowUp': app.move(-1); return true;
       case 'G': app.moveTo(app.state.threads.length - 1); return true;
       // As in aerc: folders, or the messages of an open conversation.
-      case 'J': if (app.state.reader) app.focusMessage(1); else app.moveFolder(1); return true;
-      case 'K': if (app.state.reader) app.focusMessage(-1); else app.moveFolder(-1); return true;
+      case 'J': app.moveFolder(1); return true;
+      case 'K': app.moveFolder(-1); return true;
       case '+': app.toggleCurrentSection(); return true;
-      case 'l': case 'ArrowRight': app.openCursor(); return true;
       case 'Enter': app.enter(); return true;
-      case 'h': case 'ArrowLeft': app.closeReader(); return true;
       case 'o': app.openAttachment(); return true;
       case 'd': app.act('done'); return true;
       case 'D': case '#': case 'Delete': app.act('trash'); return true;

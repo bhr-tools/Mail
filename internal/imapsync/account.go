@@ -3,7 +3,9 @@ package imapsync
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log"
+	"slices"
 	"sort"
 	"strings"
 	"sync"
@@ -49,6 +51,8 @@ type Account struct {
 	worker conn // synchronization and actions
 	reader conn // what the app waits for
 
+	refused *refusals
+
 	wake chan struct{}
 
 	mu       sync.Mutex
@@ -70,16 +74,18 @@ type Manager struct {
 func New(store *db.Store, accounts []*config.Account, window time.Duration) *Manager {
 	m := &Manager{store: store}
 	for _, cfg := range accounts {
+		refused := &refusals{}
 		m.accounts = append(m.accounts, &Account{
-			cfg:    cfg,
-			store:  store,
-			window: window,
-			worker: conn{account: cfg},
-			reader: conn{account: cfg},
-			wake:   make(chan struct{}, 1),
-			status: Status{State: "connecting"},
-			roles:  map[string]bool{},
-			full:   true,
+			cfg:     cfg,
+			store:   store,
+			window:  window,
+			worker:  conn{account: cfg, refused: refused},
+			reader:  conn{account: cfg, refused: refused},
+			refused: refused,
+			wake:    make(chan struct{}, 1),
+			status:  Status{State: "connecting"},
+			roles:   map[string]bool{},
+			full:    true,
 		})
 	}
 	return m
@@ -235,6 +241,7 @@ func (a *Account) cycle(ctx context.Context, full bool, roles map[string]bool) e
 		if err != nil {
 			return err
 		}
+		var refused error
 		// The inbox first: it is what is waited for.
 		sort.SliceStable(folders, func(i, j int) bool { return folders[i].Role == config.Inbox && folders[j].Role != config.Inbox })
 		for _, f := range folders {
@@ -246,10 +253,20 @@ func (a *Account) cycle(ctx context.Context, full bool, roles map[string]bool) e
 			}
 			a.setStatus("syncing", nil)
 			if err := a.syncFolder(c, f); err != nil {
-				return err
+				if !isServerRefusal(err) {
+					return err
+				}
+				// One folder the server refuses does not hold up the others.
+				log.Printf("%s: folder %s: %v", a.cfg.ID, f.Name, err)
+				if refused == nil {
+					refused = fmt.Errorf("folder %s: %w", f.Name, err)
+				}
 			}
 		}
-		return a.prefetch(c)
+		if err := a.prefetch(c); err != nil {
+			return err
+		}
+		return refused
 	})
 }
 
@@ -345,7 +362,18 @@ func (a *Account) resolveFolders(c *imapclient.Client) error {
 			}
 		}
 	}
+	// Folders set by hand are created when missing (an archive on a server
+	// that has none).
 	for role, name := range a.cfg.Folders {
+		if i := slices.IndexFunc(all, func(n string) bool { return strings.EqualFold(n, name) }); i >= 0 {
+			name = all[i]
+		} else {
+			if err := c.Create(name, nil).Wait(); err != nil {
+				log.Printf("%s: create folder %s for %s: %v", a.cfg.ID, name, role, err)
+				continue
+			}
+			all = append(all, name)
+		}
 		found[role] = name
 	}
 	for _, role := range config.Roles {

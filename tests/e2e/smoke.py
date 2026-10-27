@@ -1,6 +1,6 @@
 """End-to-end smoke test of the web app in Chromium (desktop and phone).
 
-Run against a fresh demo instance (see tests/e2e/run.sh): one account with
+Run against a fresh instance (see tests/e2e/run.sh): one account with
 sample mail, served from memory. Screenshots are written to $OUT.
 """
 import os
@@ -66,10 +66,11 @@ def desktop(browser):
     expect(page.locator(".row-snippet").first).to_contain_text("climbing gym")
     shot(page, "01-inbox")
 
-    # j l: the newsletter opens, remote images blocked.
+    # The reader always shows the conversation under the cursor.
+    expect(page.locator(".reader-subject")).to_have_text("Climbing on Saturday?")
+    # j: the newsletter, remote images blocked.
     page.keyboard.press("j")
     expect(rows(page).nth(1)).to_have_class(re.compile("cursor"))
-    page.keyboard.press("l")
     card = page.locator(".message-card").last
     expect(page.locator(".reader-subject")).to_have_text("Five books for the evenings")
     expect(card.locator(".images-banner")).to_be_visible()
@@ -77,8 +78,12 @@ def desktop(browser):
     expect(frame.locator("h1")).to_have_text("Five books for the evenings")
     assert frame.locator("img").first.get_attribute("src") in ("", None), "remote image loaded without asking"
     assert frame.locator("script").count() == 0
-    # Opening read it.
+    # Shown a moment, it is read; one passed over quickly stays unread.
     expect(row(page, "Five books")).not_to_have_class(re.compile("unread"))
+    expect(row(page, "Climbing on Saturday?")).to_have_class(re.compile("unread"))
+    # Escape does not close the reader.
+    page.keyboard.press("Escape")
+    expect(page.locator(".reader-subject")).to_have_text("Five books for the evenings")
     shot(page, "02-images-blocked")
 
     page.keyboard.press("i")
@@ -107,11 +112,11 @@ def desktop(browser):
     expect(page.locator(".toast")).to_contain_text("Archived")
     expect(rows(page)).to_have_count(3)
     expect(page.locator(".reader-subject")).to_have_text("Invoice for the gala hall")
-    # Shift+J / Shift+K: next / previous folder (once the reader is closed).
-    page.keyboard.press("h")
+    # Shift+J / Shift+K: next / previous folder, the reader open.
     page.keyboard.press("J")
     expect(page.locator("#list-title")).to_contain_text("Archive")
     expect(row(page, "Five books")).to_have_count(1)
+    expect(page.locator(".reader-subject")).to_have_text(re.compile("."))
     page.keyboard.press("K")
     expect(page.locator("#list-title")).to_contain_text("Inbox")
     page.keyboard.press("z")
@@ -126,12 +131,12 @@ def desktop(browser):
     res = page.request.get(BASE + href)
     assert res.ok and res.headers["content-type"] == "application/pdf", res.headers
 
-    # A conversation with a reply from Sent: unread message unfolded.
+    # A conversation with a reply from Sent: every message unfolded.
     page.keyboard.press("G")
     expect(page.locator(".reader-subject")).to_have_text("Re: Lab report review")
     cards = page.locator(".message-card")
     expect(cards).to_have_count(3)
-    expect(cards.nth(0)).to_have_class(re.compile("collapsed"))
+    expect(page.locator(".message-card.collapsed")).to_have_count(0)
     expect(cards.nth(1)).to_contain_text("Ben")
     expect(cards.nth(2)).not_to_have_class(re.compile("collapsed"))
     expect(cards.nth(2).locator(".mail-text")).to_contain_text("I added two figures")
@@ -173,7 +178,6 @@ def desktop(browser):
     expect(page.locator(".toast")).to_contain_text("Draft saved")
     expect(compose).to_have_count(0)
 
-    page.keyboard.press("h")
     for _ in range(3):
         page.keyboard.press("J")
     expect(page.locator("#list-title")).to_contain_text("Drafts")
@@ -246,7 +250,6 @@ def desktop(browser):
     page.keyboard.press("Escape")
 
     page.emulate_media(color_scheme="light")
-    page.keyboard.press("l")
     expect(page.locator(".reader-subject")).to_be_visible()
     shot(page, "07-light")
     ctx.close()

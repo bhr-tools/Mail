@@ -71,7 +71,42 @@ func (a *API) accounts(w http.ResponseWriter, r *http.Request) {
 		}
 		list = append(list, item)
 	}
+	// In the order arranged in the sidebar; accounts never moved keep the
+	// configuration order, after the others.
+	order, err := a.store.AccountOrder()
+	if err != nil {
+		fail(w, r, err)
+		return
+	}
+	position := func(id string) int {
+		if p, ok := order[id]; ok {
+			return p
+		}
+		return len(order)
+	}
+	sort.SliceStable(list, func(i, j int) bool { return position(list[i].ID) < position(list[j].ID) })
 	writeJSON(w, http.StatusOK, map[string]any{"accounts": list, "version": a.store.Version(), "no_auth": a.noAuth})
+}
+
+// setAccountOrder records the order of the accounts in the sidebar.
+func (a *API) setAccountOrder(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		Accounts []string `json:"accounts"`
+	}
+	if !decode(w, r, &body) {
+		return
+	}
+	for _, id := range body.Accounts {
+		if a.mail.Account(id) == nil {
+			writeError(w, http.StatusBadRequest, "unknown account "+id)
+			return
+		}
+	}
+	if err := a.store.SetAccountOrder(body.Accounts); err != nil {
+		fail(w, r, err)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
 }
 
 func (a *API) account(r *http.Request, id string) (*imapsync.Account, error) {
