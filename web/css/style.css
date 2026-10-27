@@ -698,7 +698,9 @@ select.compose-input { cursor: pointer; }
   .folder-row { min-height: 42px; font-size: 0.94rem; }
 
   .list-pane { width: 100%; border-right: none; }
-  .pane-header { padding: max(8px, env(safe-area-inset-top)) 8px 8px; height: auto; min-height: 52px; }
+  /* Sticky with a background, iOS 26 extends its colour under the status
+     bar instead of blurring the top of the page. */
+  .pane-header { position: sticky; top: 0; z-index: 10; background: var(--rp-base); padding: max(8px, env(safe-area-inset-top)) 8px 8px; height: auto; min-height: 52px; }
   .menu-toggle, .back-button { display: inline-flex; color: var(--rp-text); }
   .reader-pane { display: none; }
   body.reading .list-pane { display: none; }
