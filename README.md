@@ -99,7 +99,22 @@ services.caddy.virtualHosts."mail.example.com".extraConfig = "reverse_proxy loca
 
 Then open the address, choose a master password, and in the settings menu choose **Open mailto: links here** to make it the browser's mail app.
 
-Options of an instance: `port`, `host` (127.0.0.1), `dataDir`, `dbPath`, `window` (`8760h`), `noAuth`, `user`, `group`, `openFirewall`, `accounts`. Options of an account: `name`, `address`, `realName`, `userName` (the address), `passwordFile`, `imap` and `smtp` (`host`, `port`, `security`: `tls`, `starttls` or `none`), `folders`, `saveSent` (yes, except for Gmail, which keeps sent mail itself).
+The addresses end up in the Nix store, and in the repository of the configuration. To keep them private, make them sops placeholders and render the accounts file with a sops template:
+
+```nix
+sops.secrets."mail-perso-address" = { };
+sops.templates."webmail-accounts.json" = {
+  content = config.services.webmail.instances.ben.accountsJSON;
+  restartUnits = [ "webmail-ben.service" ];
+};
+
+services.webmail.instances.ben = {
+  accountsFile = config.sops.templates."webmail-accounts.json".path;
+  accounts.perso.address = config.sops.placeholder."mail-perso-address";
+};
+```
+
+Options of an instance: `port`, `host` (127.0.0.1), `dataDir`, `dbPath`, `window` (`8760h`), `noAuth`, `user`, `group`, `openFirewall`, `accounts`, `accountsFile` (the generated `accountsJSON`, in the store). Options of an account: `name`, `address`, `realName`, `userName` (the address), `passwordFile`, `imap` and `smtp` (`host`, `port`, `security`: `tls`, `starttls` or `none`), `folders`, `saveSent` (yes, except for Gmail, which keeps sent mail itself).
 
 ## Development
 

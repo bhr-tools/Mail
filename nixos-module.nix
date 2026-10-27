@@ -3,7 +3,9 @@ self:
 # Native multi-instance NixOS module: services.webmail.instances.<name>.
 # The accounts are written to a JSON file in the store, without secrets; each
 # password is handed to the service as a systemd credential, read from a file
-# only root can read (a sops secret).
+# only root can read (a sops secret). To keep the addresses out of the store
+# (and of a public repository), render accountsJSON with sops placeholders
+# into a sops template and point accountsFile to it.
 { config, lib, pkgs, ... }:
 
 let
@@ -80,7 +82,7 @@ let
     };
   });
 
-  accountsFile = name: inst: pkgs.writeText "webmail-${name}-accounts.json" (builtins.toJSON {
+  accountsJSON = name: accounts: builtins.toJSON {
     accounts = lib.mapAttrsToList (id: a: {
       inherit id;
       inherit (a) name address folders;
@@ -89,8 +91,8 @@ let
       password_file = "/run/credentials/${serviceName name}.service/account-${id}";
       imap = { inherit (a.imap) host port security; };
       smtp = { inherit (a.smtp) host port security; };
-    } // lib.optionalAttrs (a.saveSent != null) { save_sent = a.saveSent; }) inst.accounts;
-  });
+    } // lib.optionalAttrs (a.saveSent != null) { save_sent = a.saveSent; }) accounts;
+  };
 
   serviceName = name: if name == "default" then "webmail" else "webmail-${name}";
 in
@@ -141,6 +143,30 @@ in
             default = { };
             description = "Mail accounts, by short ID (lowercase letters, digits, dashes).";
           };
+          accountsJSON = lib.mkOption {
+            type = lib.types.str;
+            readOnly = true;
+            default = accountsJSON name config.accounts;
+            defaultText = lib.literalMD "the accounts, in the format of the `-accounts` file";
+            description = ''
+              Content of the accounts file built from `accounts`. With sops
+              placeholders as addresses, it is the content of a sops template
+              for `accountsFile`.
+            '';
+          };
+          accountsFile = lib.mkOption {
+            # A string, not a path: a path would copy the file to the store.
+            type = lib.types.str;
+            default = "${pkgs.writeText "webmail-${name}-accounts.json" config.accountsJSON}";
+            defaultText = lib.literalMD "`accountsJSON`, written to the store";
+            example = lib.literalExpression ''config.sops.templates."webmail-accounts.json".path'';
+            description = ''
+              Absolute path of the accounts file, handed to the service as a
+              systemd credential. Point it to a sops template rendering
+              `accountsJSON` to keep the addresses out of the store; give that
+              template `restartUnits`, its path does not change with its content.
+            '';
+          };
           user = lib.mkOption {
             type = lib.types.str;
             default = "webmail";
@@ -190,10 +216,11 @@ in
         wantedBy = [ "multi-user.target" ];
 
         serviceConfig = {
-          ExecStart = "${lib.getExe cfg.package} -host ${inst.host} -port ${toString inst.port} -data-dir ${toString inst.dataDir} -db ${toString inst.dbPath} -window ${inst.window} -accounts ${accountsFile name inst}"
+          ExecStart = "${lib.getExe cfg.package} -host ${inst.host} -port ${toString inst.port} -data-dir ${toString inst.dataDir} -db ${toString inst.dbPath} -window ${inst.window} -accounts /run/credentials/${serviceName name}.service/accounts"
             + lib.optionalString inst.noAuth " -no-auth";
-          # Passwords, readable by the service only, under /run/credentials.
-          LoadCredential = lib.mapAttrsToList (id: a: "account-${id}:${a.passwordFile}") inst.accounts;
+          # Accounts and passwords, readable by the service only, under /run/credentials.
+          LoadCredential = [ "accounts:${inst.accountsFile}" ]
+            ++ lib.mapAttrsToList (id: a: "account-${id}:${a.passwordFile}") inst.accounts;
           Restart = "always";
           RestartSec = 3;
           User = inst.user;
