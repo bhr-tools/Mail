@@ -396,12 +396,15 @@ const frameCSP = "default-src 'none'; style-src 'unsafe-inline'; img-src 'self' 
 	"frame-ancestors 'self'; base-uri 'none'; form-action 'none'"
 
 // frameStyle is the paper the message is shown on: mail is designed for a
-// light background, so it stays light in dark mode.
+// light background, so it stays light in dark mode. Tables keep their width:
+// a layout wider than the frame is scaled down as a whole by the reader,
+// rather than squeezed into a column. iOS must not enlarge the text of
+// narrow columns on its own.
 const frameStyle = `<style>
-html { background: #fffaf3; color: #26233a; color-scheme: light; }
-body { margin: 0; padding: 20px 24px; font: 15px/1.55 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; overflow-wrap: anywhere; }
+html { background: #fffaf3; color: #26233a; color-scheme: light; -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
+body { margin: 0; padding: 20px 24px; font: 15px/1.55 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; overflow-wrap: break-word; }
+@media (max-width: 480px) { body { padding: 12px; } }
 img { max-width: 100%; height: auto; }
-table { max-width: 100%; }
 a { color: #286983; }
 blockquote { margin: 0 0 0 4px; padding-left: 12px; border-left: 3px solid #dfdad9; color: #575279; }
 pre { white-space: pre-wrap; }

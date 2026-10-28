@@ -496,6 +496,29 @@ select.input { cursor: pointer; }
   font-weight: 700;
   line-height: 1.5;
 }
+/* Swipe actions (phone): the row slides over them. */
+.swipe { position: relative; overflow: hidden; }
+.swipe-action {
+  position: absolute;
+  inset: 0;
+  display: none;
+  align-items: center;
+  gap: 8px;
+  padding: 0 24px;
+  background: var(--rp-overlay);
+  color: var(--rp-subtle);
+  font-size: 0.86rem;
+  font-weight: 700;
+  transition: background-color 0.15s, color 0.15s;
+}
+.swipe-left { justify-content: flex-end; }
+.swipe.to-left .swipe-left, .swipe.to-right .swipe-right { display: flex; }
+.swipe.armed .swipe-action.danger { background: var(--danger); color: var(--on-accent); }
+.swipe.armed .swipe-action.move { background: var(--rp-iris); color: var(--on-accent); }
+.swipe-action .icon svg { transition: transform 0.15s; }
+.swipe.armed .swipe-action .icon svg { transform: scale(1.2); }
+.pull-hint { display: none; }
+
 .list-empty { padding: 48px 24px; color: var(--rp-muted); font-size: 0.88rem; text-align: center; }
 .list-more { display: block; width: 100%; padding: 14px; color: var(--rp-subtle); font-size: 0.82rem; }
 .list-more:hover { color: var(--rp-text); }
@@ -505,6 +528,9 @@ select.input { cursor: pointer; }
    ========================================================================== */
 
 .reader-pane { display: flex; flex-direction: column; flex: 1; min-width: 0; min-height: 0; overflow-y: auto; background: var(--rp-base); }
+/* The pane scrolls: its parts keep their height (a long subject wraps). */
+.reader-pane > * { flex-shrink: 0; }
+.reader-title, .more-actions { display: none; }
 .reader-empty { margin: auto; padding: 24px; color: var(--rp-muted); font-size: 0.88rem; text-align: center; }
 .reader-empty .icon svg { width: 40px; height: 40px; margin-bottom: 12px; stroke-width: 1.25; opacity: 0.6; }
 .reader-empty p + p { margin-top: 6px; }
@@ -705,11 +731,35 @@ select.compose-input { cursor: pointer; }
   .reader-pane { display: none; }
   body.reading .list-pane { display: none; }
   body.reading .reader-pane { display: flex; }
+  .thread-list { position: relative; z-index: 1; }
+  .thread-row { padding: 12px 16px 13px 10px; }
+  .row-top, .row-subject { font-size: 0.94rem; }
+  .row-snippet { font-size: 0.86rem; }
+  .swipe { touch-action: pan-y; }
+  /* No keyboard: the cursor is not shown. */
+  .swipe > .thread-row:not(.selected) { background: var(--rp-base); box-shadow: none; }
+  .swipe.swiping > .thread-row { box-shadow: 0 0 12px rgb(0 0 0 / 0.25); }
+  /* Shown in the space the bounce of iOS opens above the list. */
+  .pull-hint { display: block; position: relative; height: 0; opacity: 0; }
+  .pull-hint span { position: absolute; top: 18px; right: 0; left: 0; color: var(--rp-muted); font-size: 0.8rem; text-align: center; }
+  .pull-hint.ready span { color: var(--accent); font-weight: 600; }
+
   .reader-header { padding: max(8px, env(safe-area-inset-top)) 8px 8px; }
+  .reader-header .reader-subject { display: none; }
+  .reader-actions { margin-left: auto; }
   .reader-actions .optional { display: none; }
-  .thread-messages { padding: 12px 8px 4px; }
-  .message-body { padding: 0 10px 12px; }
-  .reply-bar { padding: 6px 8px calc(24px + env(safe-area-inset-bottom)); }
+  .more-actions { display: inline-flex; }
+  .reader-title { display: block; padding: 18px 16px 10px; font-size: 1.3rem; font-weight: 700; line-height: 1.3; letter-spacing: -0.01em; overflow-wrap: anywhere; }
+  /* Messages edge to edge: the mail gets the whole width. */
+  .thread-messages { gap: 0; padding: 0; }
+  .message-card { border-width: 1px 0 0; border-radius: 0; background: none; }
+  .message-card.focused { border-color: var(--border); }
+  .message-body { padding: 0 0 14px; }
+  .message-body > :not(.mail-frame) { margin-right: 16px; margin-left: 16px; }
+  .mail-frame { border-radius: 0; }
+  .images-banner .icon { display: none; }
+  .reply-bar { padding: 10px 16px calc(24px + env(safe-area-inset-bottom)); border-top: 1px solid var(--border); }
+  .reply-bar .button { flex: 1; height: 40px; }
   .reply-bar kbd, .body-switch kbd, .images-banner kbd { display: none; }
 
   .statusbar { display: none; }

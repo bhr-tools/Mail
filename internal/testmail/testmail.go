@@ -188,6 +188,7 @@ func (s *Server) Seed(now time.Time) error {
 	samples := []sample{
 		{"Archive", plain(now.Add(-40*day), "Camille Martin <camille@inp.test>", Address, "Project kickoff", "kickoff@inp.test", "",
 			"Hi Ben,\n\nThe project kickoff is moved to Thursday 10:00, room B204.\n\nCamille"), []imap.Flag{imap.FlagSeen}},
+		{"Archive", fixedLayout(now.Add(-20 * day)), []imap.Flag{imap.FlagSeen}},
 		{"Archive", plain(now.Add(-12*day), "Bank <noreply@bank.test>", Address, "Your October statement", "stmt@bank.test", "",
 			"Your statement is available in your online space."), []imap.Flag{imap.FlagSeen}},
 		{"INBOX", plain(now.Add(-3*day), "Camille Martin <camille@inp.test>", Address, "Lab report review", "lab1@inp.test", "",
@@ -243,6 +244,19 @@ func withAttachment(date time.Time, from, to, subject, id, text, filename, data 
 		"--MIX\r\nContent-Type: text/plain; charset=utf-8\r\n\r\n" + crlf(text) + "\r\n" +
 		"--MIX\r\nContent-Type: application/pdf; name=\"" + filename + "\"\r\nContent-Disposition: attachment; filename=\"" + filename + "\"\r\n" +
 		"Content-Transfer-Encoding: base64\r\n\r\n" + base64.StdEncoding.EncodeToString([]byte(data)) + "\r\n--MIX--\r\n"
+}
+
+// fixedLayout is mail laid out for a desktop: a long subject, and a table
+// 600 pixels wide, centered on a grey background, its text justified.
+func fixedLayout(date time.Time) string {
+	html := `<html><body style="margin:0;background:#eeeeee"><table width="100%" cellpadding="0" cellspacing="0" bgcolor="#eeeeee"><tr><td align="center">` +
+		`<table width="600" cellpadding="40" cellspacing="0" bgcolor="#ffffff" style="width:600px;box-shadow:0 0 30px #999">` +
+		`<tr><td style="font-size:18px;text-align:justify"><h1 style="color:#e3262f;text-align:center">Your cyber e-learning module is waiting</h1>` +
+		`<p>You have probably heard in the media, or at work, of phishing, of identity theft or of ransomware. ` +
+		`This short module shows how to spot them, in twenty minutes.</p></td></tr></table></td></tr></table></body></html>`
+	return header(date, "Security Training <training@school.test>", Address,
+		"Ben Martin, your cyber e-learning module on phishing and passwords is waiting for you", "elearning@school.test", "") +
+		"Content-Type: text/html; charset=utf-8\r\n\r\n" + html + "\r\n"
 }
 
 func newsletter(date time.Time, image string) string {

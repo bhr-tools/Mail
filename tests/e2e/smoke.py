@@ -42,6 +42,29 @@ def folders(page):
     return page.locator("#folders .folder-row")
 
 
+def rect(locator):
+    """Box of an element, measured in one go: the views may be drawn again
+    meanwhile (bounding_box then gives None)."""
+    return locator.evaluate("e => { const r = e.getBoundingClientRect(); return { x: r.x, y: r.y, width: r.width, height: r.height }; }")
+
+
+def swipe(page, dx, lift=True):
+    """Slides a finger across the first conversation, dx pixels sideways.
+    Pointer events sent from the page: the touch input of CDP proved
+    unreliable here (touches lost, or landing at 0,0), and the row is looked
+    up as the events are sent, the list being drawn again at any time."""
+    page.evaluate("""([dx, lift]) => {
+        const row = document.querySelector('.thread-row');
+        const r = row.getBoundingClientRect();
+        const x = r.x + r.width / 2, y = r.y + r.height / 2;
+        const fire = (type, cx) => row.dispatchEvent(new PointerEvent(type,
+            { pointerId: 7, pointerType: 'touch', isPrimary: true, clientX: cx, clientY: y, bubbles: true }));
+        fire('pointerdown', x);
+        for (let i = 1; i <= 12; i++) fire('pointermove', x + dx * i / 12);
+        if (lift) fire('pointerup', x + dx);
+    }""", [dx, lift])
+
+
 def setup(page):
     page.goto(BASE)
     page.get_by_placeholder("At least 4 characters").fill(PASSWORD)
@@ -265,12 +288,63 @@ def phone(browser):
     page.get_by_role("button", name="Unlock").click()
     expect(rows(page).first).to_be_visible()
     shot(page, "08-phone-list")
+    count = rows(page).count()
     rows(page).first.tap()
-    expect(page.locator(".reader-subject")).to_be_visible()
+    expect(page.locator(".reader-title")).to_be_visible()
+    expect(page.locator(".reader-subject")).to_be_hidden()
     expect(page.locator(".list-pane")).to_be_hidden()
     shot(page, "09-phone-reader")
     page.locator(".back-button").tap()
     expect(page.locator(".list-pane")).to_be_visible()
+
+    # Swipes: right to move, left to the trash (z brings it back).
+    swipe(page, -200, lift=False)
+    expect(page.locator(".swipe.armed .swipe-left")).to_be_visible()
+    shot(page, "08b-phone-swipe")
+    page.evaluate("document.querySelector('.swipe.swiping .thread-row').dispatchEvent(new PointerEvent('pointercancel', { pointerId: 7, pointerType: 'touch', bubbles: true }))")
+    expect(page.locator(".swipe.to-left")).to_have_count(0)
+    swipe(page, 250)
+    expect(page.locator(".modal.picker")).to_be_visible()
+    page.keyboard.press("Escape")
+    expect(rows(page)).to_have_count(count)
+    swipe(page, 60)
+    expect(page.locator(".swipe.to-right")).to_have_count(0)
+    expect(page.locator(".modal.picker")).to_have_count(0)
+    swipe(page, -250)
+    expect(page.locator(".toast")).to_contain_text("Moved to the trash")
+    expect(rows(page)).to_have_count(count - 1)
+    expect(page.locator(".reader-title")).to_be_hidden()
+    page.keyboard.press("z")
+    expect(rows(page)).to_have_count(count)
+
+    # Mail laid out for a desktop: a long subject that wraps, a 600 pixel
+    # table scaled down to the width of the phone.
+    page.keyboard.press("+")
+    page.keyboard.press("J")
+    expect(page.locator("#list-title")).to_contain_text("Archive")
+    row(page, "e-learning").tap()
+    title = page.locator(".reader-title")
+    expect(title).to_contain_text("e-learning module on phishing")
+    header = rect(page.locator(".reader-header"))
+    assert header["height"] < 80, f"reader header grew: {header}"
+    assert rect(title)["y"] >= header["y"] + header["height"] - 1, "subject under the header"
+    page.wait_for_function("""() => {
+        const f = document.querySelector('iframe.mail-frame');
+        const d = f && f.contentDocument;
+        return d && d.body && d.body.style.zoom && d.documentElement.scrollWidth <= f.clientWidth + 1;
+    }""")
+    fit = page.evaluate("""() => {
+        const f = document.querySelector('iframe.mail-frame');
+        return { zoom: Number(f.contentDocument.body.style.zoom), frame: f.clientWidth, height: f.clientHeight };
+    }""")
+    assert 0.4 < fit["zoom"] < 0.8 and fit["height"] > 150, f"wide mail not fitted: {fit}"
+    shot(page, "09b-phone-wide-mail")
+    page.locator(".more-actions").tap()
+    expect(page.locator(".popover.sheet")).to_contain_text("Mark as unread")
+    page.keyboard.press("Escape")
+    page.locator(".back-button").tap()
+    page.keyboard.press("K")
+    expect(page.locator("#list-title")).to_contain_text("Inbox")
     page.locator("#menu-toggle").tap()
     expect(page.locator(".sidebar.open")).to_be_visible()
     shot(page, "10-phone-folders")

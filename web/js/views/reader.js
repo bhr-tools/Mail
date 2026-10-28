@@ -4,6 +4,7 @@
 
 import { api } from '../api.js';
 import { h, icon } from '../dom.js';
+import { openMenu } from '../ui/overlay.js';
 import { fileSize, formatAddresses, longDate, personName, renderText } from '../format.js';
 
 /** Card of a message, kept between renders so frames are not reloaded. */
@@ -37,7 +38,11 @@ function renderHead(app, c) {
       h('span', { title: new Date(m.date).toLocaleString() }, longDate(m.date))));
 }
 
-/** Sizes a mail frame to its content, and keeps keys working inside it. */
+/**
+ * Sizes a mail frame to its content, and keeps keys working inside it.
+ * Mail laid out wider than the frame (a 600 pixel table on a phone) is
+ * scaled down to fit, as phone mail apps do.
+ */
 function fitFrame(app, frame) {
   frame.addEventListener('load', () => {
     let doc;
@@ -46,13 +51,22 @@ function fitFrame(app, frame) {
     } catch {
       return;
     }
-    if (!doc) return;
+    if (!doc?.body) return;
+    let width = 0;
     const fit = () => {
-      frame.style.height = `${Math.max(60, doc.documentElement.scrollHeight)}px`;
+      const w = frame.clientWidth;
+      if (w && w !== width) {
+        width = w;
+        doc.body.style.zoom = '';
+        const natural = doc.documentElement.scrollWidth;
+        if (natural > w + 1) doc.body.style.zoom = String(w / natural);
+      }
+      frame.style.height = `${Math.max(60, Math.ceil(doc.documentElement.scrollHeight))}px`;
     };
     fit();
     try {
       new ResizeObserver(fit).observe(doc.body);
+      new ResizeObserver(fit).observe(frame);
     } catch { /* fitted once */ }
     // Images arriving later change the height.
     for (const img of doc.images) img.addEventListener('load', fit);
@@ -148,7 +162,7 @@ export function renderReader(app) {
     el.replaceChildren(h('div', { class: 'reader-empty' },
       icon('mail'),
       h('p', null, 'No conversation open.'),
-      h('p', null, h('kbd', null, 'j'), ' ', h('kbd', null, 'k'), ' to move, ', h('kbd', null, 'l'), ' to open.')));
+      h('p', null, h('kbd', null, 'j'), ' ', h('kbd', null, 'k'), ' to move.')));
     return;
   }
   const latest = r.messages[r.messages.length - 1];
@@ -163,7 +177,19 @@ export function renderReader(app) {
       role === 'trash' ? null : actionButton('Trash', 'trash', 'D', () => app.act('trash')),
       actionButton(unread ? 'Mark as read' : 'Mark as unread', unread ? 'mailOpen' : 'mail', 'u', () => app.act(unread ? 'read' : 'unread'), { optional: true }),
       actionButton(starred ? 'Unstar' : 'Star', 'star', 's', () => app.act(starred ? 'unstar' : 'star'), { on: starred }),
-      actionButton('Move to…', 'folder', 'm', () => app.openMoveMenu(), { optional: true })));
+      actionButton('Move to…', 'folder', 'm', () => app.openMoveMenu(), { optional: true }),
+      // On a phone, the actions that do not fit the header.
+      h('button', {
+        type: 'button', class: 'icon-button more-actions', title: 'More', attrs: { 'aria-label': 'More actions' },
+        onclick: (e) => openMenu(e.currentTarget, [
+          { label: unread ? 'Mark as read' : 'Mark as unread', icon: unread ? 'mailOpen' : 'mail', run: () => app.act(unread ? 'read' : 'unread') },
+          { label: 'Move to…', icon: 'folder', run: () => app.openMoveMenu() },
+          ...(latest && !latest.draft ? ['separator',
+            { label: 'Reply', icon: 'reply', run: () => app.reply('reply') },
+            { label: 'Reply all', icon: 'replyAll', run: () => app.reply('all') },
+            { label: 'Forward', icon: 'forward', run: () => app.reply('forward') }] : []),
+        ], { title: r.subject || '(no subject)' }),
+      }, icon('more'))));
 
   const list = h('div', { class: 'thread-messages' });
   r.messages.forEach((m, i) => {
@@ -185,7 +211,10 @@ export function renderReader(app) {
     h('button', { type: 'button', class: 'button', onclick: () => app.reply('all') }, icon('replyAll'), 'Reply all ', h('kbd', null, 'R')),
     h('button', { type: 'button', class: 'button', onclick: () => app.reply('forward') }, icon('forward'), 'Forward ', h('kbd', null, 'f'))) : null;
 
-  el.replaceChildren(header, list, replyBar || '');
+  // On a phone the subject heads the conversation, where it has room, and
+  // the header keeps the actions only.
+  const title = h('h1', { class: 'reader-title' }, r.subject || '(no subject)');
+  el.replaceChildren(header, title, list, replyBar || '');
 }
 
 /** Scrolls the focused message into view. */

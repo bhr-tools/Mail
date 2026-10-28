@@ -4,11 +4,12 @@ A minimalist, self-hosted mail client in the spirit of Get Done, Focus and Calen
 
 - **Your accounts, one place:** Gmail (with an app password), any IMAP/SMTP server. Every inbox together, or one account at a time. Your own folders and Gmail labels are there too.
 - **Minimal sidebar:** each account folds to its inbox; unfold it to reach the other folders. Drag an account by its name to reorder the accounts (kept on the server, so every device shows the same order).
-- **Images, safely:** HTML mail is shown as designed, in a frame that runs no script and loads nothing from the internet. Remote images, which tell senders when you read, stay hidden until you press `i`, and then go through the server, so senders never see your address. Senders can be trusted for good.
+- **Images, safely:** HTML mail is shown as designed (on a phone, a layout made for a desktop is scaled down to the width of the screen), in a frame that runs no script and loads nothing from the internet. Remote images, which tell senders when you read, stay hidden until you press `i`, and then go through the server, so senders never see your address. Senders can be trusted for good.
 - **Done means archived:** `d` takes a conversation out of the inbox, `z` brings it back. Actions show at once and reach the server in the background.
 - **Conversations:** the reader always shows the conversation under the cursor, every message unfolded; replies are grouped with the messages they answer, your own answers (from Sent) included. Quotes are folded. A conversation counts as read once it has been shown a second.
 - **Plain text writing:** reply, reply all, forward (with the attachments), drafts kept on the server, addresses completed from the people you write to. A missing attachment is caught before sending.
 - **Full Vim navigation:** fully operable from the keyboard, AZERTY included.
+- **At home on a phone:** installable on the home screen. Swipe a conversation left to throw it away, right to move it; pull the list down to check for new mail; swipe from the left edge of a conversation to go back.
 - **Quiet:** no notification, no badge, no tracking. New mail shows when you look.
 - **Rosé Pine palette:** Moon (dark) and Dawn (light) themes, following the system setting.
 - **One binary:** a single Go binary with embedded SQLite and web app, packaged with Nix Flakes (multi-instance NixOS module).

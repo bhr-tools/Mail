@@ -2,6 +2,7 @@
 
 import { h, icon } from '../dom.js';
 import { personName, shortDate } from '../format.js';
+import { deferWhileSwiping, swipeable } from '../ui/swipe.js';
 
 export const threadKey = (t) => `${t.account}\u0000${t.thread}`;
 
@@ -20,7 +21,7 @@ function row(app, t, index) {
   const { cursor, selected, open } = app.state;
   const showAccount = app.state.accounts.length > 1 && (app.state.view.account === '' || app.state.search);
   const account = app.accountOf(t.account);
-  return h('div', {
+  const el = h('div', {
     class: ['thread-row', t.unread > 0 && 'unread', index === cursor && 'cursor', selected.has(key) && 'selected', open === key && 'open'],
     attrs: { role: 'option', 'aria-selected': String(index === cursor) },
     dataset: { index },
@@ -46,9 +47,16 @@ function row(app, t, index) {
       t.attachments ? icon('paperclip') : null,
       t.flagged ? icon('star') : null)),
   h('div', { class: 'row-snippet' }, t.latest.snippet || ' '));
+  // On a phone: swipe left to throw away, right to move.
+  const role = app.roleOf(t);
+  return swipeable(el, {
+    left: role === 'trash' ? null : { label: 'Trash', icon: 'trash', className: 'danger', away: true, run: () => app.act('trash', { list: [t] }) },
+    right: { label: 'Move', icon: 'folder', className: 'move', run: () => app.openMoveMenu([t]) },
+  });
 }
 
 export function renderList(app) {
+  if (deferWhileSwiping(() => renderList(app))) return;
   const el = document.getElementById('thread-list');
   const { threads, loading, more, search } = app.state;
   if (!threads.length) {

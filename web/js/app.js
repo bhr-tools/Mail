@@ -9,6 +9,7 @@ import { renderList, threadKey, updateRows } from './views/list.js';
 import { renderBody, renderReader, scrollToFocused } from './views/reader.js';
 import { openCompose } from './views/compose.js';
 import { initKeys } from './keys.js';
+import { edgeSwipe, pullToRefresh } from './ui/swipe.js';
 
 const COLORS = ['pine', 'rose', 'iris', 'gold', 'foam', 'love'];
 const PAGE = 50;
@@ -646,8 +647,7 @@ class App {
   }
 
   /** m: moves the conversations to a folder picked from the list. */
-  async openMoveMenu() {
-    const list = this.targets();
+  async openMoveMenu(list = this.targets()) {
     if (!list.length) return;
     const accounts = new Set(list.map((t) => t.account));
     if (accounts.size > 1) {
@@ -1034,6 +1034,10 @@ class App {
     $('fab').addEventListener('click', () => this.compose());
     $('search-button').addEventListener('click', () => this.openSearch());
     $('refresh-button').addEventListener('click', () => this.syncNow());
+    pullToRefresh($('thread-list'), $('pull-hint'), () => this.syncNow());
+    edgeSwipe($('reader'), () => {
+      if (!this.wide()) this.closeReader();
+    });
     $('status-help').addEventListener('click', () => this.openHelp());
     $('status-sync').addEventListener('click', () => {
       const failed = this.state.accounts.filter((a) => a.status.state === 'error');
