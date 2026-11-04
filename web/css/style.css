@@ -361,6 +361,7 @@ select.input { cursor: pointer; }
   align-items: center;
   gap: 8px;
   height: 36px;
+  flex-shrink: 0;
   margin: 0 0 12px;
   padding: 0 10px;
   border: 1px solid var(--border);
@@ -371,7 +372,8 @@ select.input { cursor: pointer; }
 }
 .compose-button:hover { background: var(--rp-overlay); }
 .compose-button kbd { margin-left: auto; }
-.folder-nav { display: flex; flex-direction: column; gap: 1px; }
+/* Past the height of the sidebar, it scrolls: nothing in it is squeezed. */
+.folder-nav { display: flex; flex-direction: column; flex-shrink: 0; gap: 1px; }
 .nav-section {
   display: flex;
   align-items: center;

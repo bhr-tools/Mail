@@ -2,7 +2,7 @@
 
 A minimalist, self-hosted mail client in the spirit of Get Done, Focus and Calendar:
 
-- **Your accounts, one place:** Gmail (with an app password), any IMAP/SMTP server. Every inbox together, or one account at a time. Your own folders and Gmail labels are there too.
+- **Your accounts, one place:** Gmail (with an app password), any IMAP/SMTP server. One account at a time. Your own folders and Gmail labels are there too.
 - **Minimal sidebar:** each account folds to its inbox; unfold it to reach the other folders. Drag an account by its name to reorder the accounts (kept on the server, so every device shows the same order).
 - **Images, safely:** HTML mail is shown as designed (on a phone, a layout made for a desktop is scaled down to the width of the screen), in a frame that runs no script and loads nothing from the internet. Remote images, which tell senders when you read, stay hidden until you press `i`, and then go through the server, so senders never see your address. Senders can be trusted for good.
 - **Done means archived:** `d` takes a conversation out of the inbox, `z` brings it back. Actions show at once and reach the server in the background.
@@ -24,7 +24,7 @@ Press `?` in the app to show the cheatsheet.
 | `Ctrl+d` / `Ctrl+u` | Scroll the conversation down / up |
 | `J` / `K` | Next / previous folder of the sidebar, as in aerc |
 | `+` | Fold / unfold the account: inbox only, or every folder |
-| `&` `é` `"` `'` | Every inbox, then each account |
+| `&` `é` `"` `'` | Each account |
 | `d` | Done: archive |
 | `D` (or `#`) | Trash |
 | `I` | Back to the inbox |

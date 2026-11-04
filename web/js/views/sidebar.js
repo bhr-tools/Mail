@@ -1,4 +1,4 @@
-// Sidebar: every inbox together, then each account. An account is folded
+// Sidebar: the folders of each account. An account is folded
 // to its inbox (and the folder being viewed); unfolded, it shows every
 // folder, the person's own (Gmail labels) included.
 
@@ -41,7 +41,6 @@ export function navigation(app) {
   const { accounts, view, search } = app.state;
   const several = accounts.length > 1;
   const out = [];
-  if (several) out.push({ role: 'inbox', account: '', label: 'All inboxes', all: true });
   for (const a of accounts) {
     const account = several ? a.id : '';
     const open = app.isExpanded(a.id);
@@ -67,14 +66,6 @@ export function renderSidebar(app) {
   let owner = null;
   for (const item of items) {
     const active = !search && view.role === item.role && view.account === item.account;
-    if (item.all) {
-      const unread = accounts.reduce((n, a) => n + (a.folders.find((f) => f.role === 'inbox')?.unread || 0), 0);
-      rows.push(folderRow(app, {
-        label: 'All inboxes', iconName: 'layers', count: unread || '', unread: unread > 0, active,
-        hint: 'All inboxes (&)', run: () => app.setView('inbox', ''),
-      }));
-      continue;
-    }
     if (item.owner !== owner) {
       owner = item.owner;
       rows.push(sectionHeader(app, owner));

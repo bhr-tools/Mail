@@ -107,7 +107,8 @@ class App {
     this.state.accounts = data.accounts;
     if (!this.state.version) this.state.version = data.version;
     const { view } = this.state;
-    if (view.account && !this.accountOf(view.account)) view.account = '';
+    // With several accounts, the view is always one of them.
+    if (this.state.accounts.length > 1 && !this.accountOf(view.account)) view.account = this.state.accounts[0].id;
     // A folder gone from the server (a label deleted elsewhere).
     if (view.role.startsWith('folder:') && !this.state.accounts.some((a) => a.folders.some((f) => f.role === view.role))) {
       view.role = 'inbox';
@@ -274,7 +275,7 @@ class App {
       title.replaceChildren('Search ', h('span', { class: 'muted' }, search.query));
     } else {
       const account = this.accountOf(view.account);
-      const suffix = accounts.length > 1 ? (account ? account.name : 'All accounts') : '';
+      const suffix = accounts.length > 1 && account ? account.name : '';
       title.replaceChildren(folderLabel(view.role), suffix ? h('span', { class: 'muted' }, ` · ${suffix}`) : '');
     }
     document.title = `${search ? 'Search' : folderLabel(view.role)} · Mail`;
@@ -328,11 +329,11 @@ class App {
     this.loadThreads();
   }
 
-  /** & é " ': every inbox, then each account, in the current folder. */
+  /** & é " ': each account, in the current folder. */
   switchAccount(index) {
     const { accounts } = this.state;
     if (accounts.length < 2) return;
-    const account = index === 0 ? '' : accounts[index - 1]?.id;
+    const account = accounts[index]?.id;
     if (account === undefined) return;
     // Another account has other folders of its own.
     const { role } = this.state.view;
@@ -844,7 +845,7 @@ class App {
           h('h3', { class: 'field-label' }, 'Folders'),
           row(['J', 'K'], 'Next / previous folder'),
           row(['+'], 'Fold / unfold the account'),
-          row(['&', 'é', '"', "'"], 'All inboxes, then each account')),
+          row(['&', 'é', '"', "'"], 'Each account')),
         h('section', null,
           h('h3', { class: 'field-label' }, 'Act'),
           row(['d'], 'Done (archive)'),

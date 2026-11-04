@@ -88,6 +88,11 @@ def desktop(browser):
     expect(page.locator(".thread-row.unread")).to_have_count(4)
     expect(page.locator(".row-snippet").first).to_contain_text("climbing gym")
     shot(page, "01-inbox")
+    # A window shorter than the folders: the sidebar scrolls, nothing in it shrinks.
+    page.set_viewport_size({"width": 1366, "height": 300})
+    assert rect(page.locator("#compose-button"))["height"] == 36, rect(page.locator("#compose-button"))
+    assert page.locator("#sidebar").evaluate("e => e.scrollHeight > e.clientHeight")
+    page.set_viewport_size({"width": 1366, "height": 860})
 
     # The reader always shows the conversation under the cursor.
     expect(page.locator(".reader-subject")).to_have_text("Climbing on Saturday?")

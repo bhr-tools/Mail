@@ -19,7 +19,7 @@ function people(app, t) {
 function row(app, t, index) {
   const key = threadKey(t);
   const { cursor, selected, open } = app.state;
-  const showAccount = app.state.accounts.length > 1 && (app.state.view.account === '' || app.state.search);
+  const showAccount = app.state.accounts.length > 1 && !!app.state.search;
   const account = app.accountOf(t.account);
   const el = h('div', {
     class: ['thread-row', t.unread > 0 && 'unread', index === cursor && 'cursor', selected.has(key) && 'selected', open === key && 'open'],
