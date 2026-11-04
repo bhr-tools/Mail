@@ -191,7 +191,10 @@ export function renderReader(app) {
         ], { title: r.subject || '(no subject)' }),
       }, icon('more'))));
 
-  const list = h('div', { class: 'thread-messages' });
+  // The list stays in the page between renders, and a card moves only when
+  // out of place: taking a frame out of the page reloads it.
+  r.list ??= h('div', { class: 'thread-messages' });
+  const { list } = r;
   r.messages.forEach((m, i) => {
     const c = card(app, r, m);
     c.m = m;
@@ -203,8 +206,10 @@ export function renderReader(app) {
       if (!c.full && !c.loading && !c.error) loadBody(app, c);
       else if (!c.body.firstChild) renderBody(app, c);
     }
-    list.append(c.el);
+    const at = list.children[i];
+    if (at !== c.el) list.insertBefore(c.el, at || null);
   });
+  while (list.children.length > r.messages.length) list.lastElementChild.remove();
 
   const replyBar = latest && !latest.draft ? h('div', { class: 'reply-bar' },
     h('button', { type: 'button', class: 'button', onclick: () => app.reply('reply') }, icon('reply'), 'Reply ', h('kbd', null, 'r')),
@@ -214,7 +219,15 @@ export function renderReader(app) {
   // On a phone the subject heads the conversation, where it has room, and
   // the header keeps the actions only.
   const title = h('h1', { class: 'reader-title' }, r.subject || '(no subject)');
-  el.replaceChildren(header, title, list, replyBar || '');
+  const foot = replyBar || document.createTextNode('');
+  if (list.parentNode === el) {
+    r.header.replaceWith(header);
+    r.title.replaceWith(title);
+    r.foot.replaceWith(foot);
+  } else {
+    el.replaceChildren(header, title, list, foot);
+  }
+  Object.assign(r, { header, title, foot });
 }
 
 /** Scrolls the focused message into view. */

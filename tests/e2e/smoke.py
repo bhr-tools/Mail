@@ -104,6 +104,14 @@ def desktop(browser):
     # Shown a moment, it is read; one passed over quickly stays unread.
     expect(row(page, "Five books")).not_to_have_class(re.compile("unread"))
     expect(row(page, "Climbing on Saturday?")).to_have_class(re.compile("unread"))
+    # Redrawing the reader keeps the frame: a reload makes the mail jump.
+    page.evaluate("document.querySelector('iframe.mail-frame').contentWindow.kept = true")
+    page.keyboard.press("s")
+    expect(page.locator(".reader-actions .icon-button.on")).to_have_count(1)
+    page.keyboard.press("s")
+    expect(page.locator(".reader-actions .icon-button.on")).to_have_count(0)
+    page.wait_for_timeout(300)
+    assert page.evaluate("document.querySelector('iframe.mail-frame').contentWindow.kept === true"), "frame reloaded on redraw"
     # Escape does not close the reader.
     page.keyboard.press("Escape")
     expect(page.locator(".reader-subject")).to_have_text("Five books for the evenings")
