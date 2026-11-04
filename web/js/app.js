@@ -258,6 +258,7 @@ class App {
       case 'inbox': return 'Your inbox is empty.';
       case 'drafts': return 'No draft.';
       case 'trash': return 'The trash is empty.';
+      case 'junk': return 'No spam.';
       default: return 'No mail here.';
     }
   }

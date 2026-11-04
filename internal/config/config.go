@@ -39,10 +39,11 @@ const (
 	Sent    = "sent"
 	Drafts  = "drafts"
 	Trash   = "trash"
+	Junk    = "junk"
 )
 
 // Roles lists the folder roles in the order of the sidebar.
-var Roles = []string{Inbox, Archive, Sent, Drafts, Trash}
+var Roles = []string{Inbox, Archive, Sent, Drafts, Trash, Junk}
 
 // CustomPrefix starts the role of a folder made by the person (a Gmail
 // label): "folder:Receipts". The app keeps a copy of these too.

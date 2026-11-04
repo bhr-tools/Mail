@@ -122,7 +122,7 @@ func TestQuery(t *testing.T) {
 	if q := ParseQuery(`he said "hi`); q.Match == "" {
 		t.Error("unbalanced quote dropped the query")
 	}
-	if q := ParseQuery("x"); len(q.Roles) != 0 || len(q.ExcludeRoles) != 1 {
+	if q := ParseQuery("x"); len(q.Roles) != 0 || len(q.ExcludeRoles) != 2 {
 		t.Errorf("default folders = %v minus %v", q.Roles, q.ExcludeRoles)
 	}
 	if q := ParseQuery("in:Receipts"); len(q.Roles) != 1 || q.Roles[0] != "folder:Receipts" {

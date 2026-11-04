@@ -11,7 +11,7 @@ import (
 // or the results of a search.
 type Filter struct {
 	Roles []string // folders to look in (every folder if empty)
-	// ExcludeRoles leaves out folders (the trash, for searches).
+	// ExcludeRoles leaves out folders (the trash and spam, for searches).
 	ExcludeRoles []string
 	Account      string // "" for every account
 	// Match is an FTS5 query on the subject, the people and the text.
@@ -163,10 +163,10 @@ func (s *Store) Threads(f Filter) ([]*Thread, error) {
 
 // ThreadMessages returns the messages of a conversation, oldest first, one
 // copy per message: the copy in the folder being viewed, else in the inbox.
-// Messages in the trash only show from the trash.
+// Messages in the trash or spam only show from there.
 func (s *Store) ThreadMessages(account, thread, role string) ([]*Message, error) {
 	list, err := scanMessages(s.db.Query(`SELECT `+messageColumns+` FROM messages m JOIN folders f ON f.id = m.folder_id
-		WHERE f.account = ? AND m.thread = ? AND m.hidden = 0 AND (f.role != 'trash' OR ? = 'trash')`, account, thread, role))
+		WHERE f.account = ? AND m.thread = ? AND m.hidden = 0 AND (f.role NOT IN ('trash', 'junk') OR f.role = ?)`, account, thread, role))
 	if err != nil {
 		return nil, err
 	}

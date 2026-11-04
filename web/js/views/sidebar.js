@@ -4,9 +4,9 @@
 
 import { h, icon } from '../dom.js';
 
-export const ROLES = ['inbox', 'archive', 'sent', 'drafts', 'trash'];
-export const ROLE_LABELS = { inbox: 'Inbox', archive: 'Archive', sent: 'Sent', drafts: 'Drafts', trash: 'Trash' };
-export const ROLE_ICONS = { inbox: 'inbox', archive: 'done', sent: 'send', drafts: 'draft', trash: 'trash' };
+export const ROLES = ['inbox', 'archive', 'sent', 'drafts', 'trash', 'junk'];
+export const ROLE_LABELS = { inbox: 'Inbox', archive: 'Archive', sent: 'Sent', drafts: 'Drafts', trash: 'Trash', junk: 'Spam' };
+export const ROLE_ICONS = { inbox: 'inbox', archive: 'done', sent: 'send', drafts: 'draft', trash: 'trash', junk: 'spam' };
 const CUSTOM = 'folder:';
 
 export const isCustom = (role) => role.startsWith(CUSTOM);

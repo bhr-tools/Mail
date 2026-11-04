@@ -70,7 +70,7 @@ let
         default = { };
         example = { archive = "[Gmail]/All Mail"; };
         description = ''
-          Folder of each role (inbox, archive, sent, drafts, trash). Roles left
+          Folder of each role (inbox, archive, sent, drafts, trash, junk). Roles left
           out are found from the server (special-use attributes, usual names).
         '';
       };

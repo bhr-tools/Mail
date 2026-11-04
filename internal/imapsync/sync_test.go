@@ -89,10 +89,13 @@ func TestSyncFoldersThreadsAndBodies(t *testing.T) {
 	if len(threads(t, store, config.Drafts)) != 1 || len(threads(t, store, config.Trash)) != 1 || len(threads(t, store, config.Archive)) != 3 {
 		t.Error("drafts, trash or archive not synchronized")
 	}
+	if spam := threads(t, store, config.Junk); len(spam) != 1 || spam[0].Latest.Subject != "You won!" {
+		t.Errorf("spam = %+v", spam)
+	}
 	if folders := a.Folders(); len(folders) != 9 {
 		t.Errorf("folders = %v", folders)
 	}
-	// The person's folders are kept too; junk is not.
+	// The person's folders are kept too, as their own role for junk.
 	var own []string
 	all, _ := store.Folders("demo")
 	for _, f := range all {

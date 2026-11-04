@@ -282,14 +282,14 @@ var usualNames = map[string][]string{
 	config.Sent:    {"sent", "sent items", "sent messages", "sent mail", "envoyés", "messages envoyés", "éléments envoyés"},
 	config.Drafts:  {"drafts", "brouillons"},
 	config.Trash:   {"trash", "deleted items", "deleted messages", "bin", "corbeille", "éléments supprimés"},
+	config.Junk:    {"junk", "spam", "junk e-mail", "junk email", "bulk mail", "courrier indésirable", "pourriel", "indésirables"},
 }
 
 // noise are folders some servers show over IMAP that hold no mail to read
-// (Zimbra's contacts and chats), or junk.
+// (Zimbra's contacts and chats).
 var noise = map[string]bool{
-	"junk": true, "spam": true, "chats": true, "contacts": true, "emailed contacts": true,
+	"chats": true, "contacts": true, "emailed contacts": true,
 	"calendar": true, "tasks": true, "briefcase": true, "outbox": true, "templates": true,
-	"courrier indésirable": true, "pourriel": true,
 }
 
 var specialUse = map[imap.MailboxAttr]string{
@@ -298,6 +298,7 @@ var specialUse = map[imap.MailboxAttr]string{
 	imap.MailboxAttrSent:    config.Sent,
 	imap.MailboxAttrDrafts:  config.Drafts,
 	imap.MailboxAttrTrash:   config.Trash,
+	imap.MailboxAttrJunk:    config.Junk,
 }
 
 // resolveFolders finds the folder of each role and lists the others.

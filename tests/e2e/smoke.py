@@ -82,7 +82,7 @@ def desktop(browser):
     # Folded: the inbox only. + unfolds every folder, the own ones included.
     expect(folders(page)).to_have_count(1)
     page.keyboard.press("+")
-    expect(folders(page)).to_have_text(["Inbox4", "Archive", "Sent", "Drafts1", "Trash", "Projects", "Robotics1", "Receipts"])
+    expect(folders(page)).to_have_text(["Inbox4", "Archive", "Sent", "Drafts1", "Trash", "Spam", "Projects", "Robotics1", "Receipts"])
     expect(page.locator(".nav-section")).to_have_attribute("aria-expanded", "true")
     expect(rows(page).first).to_contain_text("Climbing on Saturday?")
     expect(page.locator(".thread-row.unread")).to_have_count(4)
@@ -247,15 +247,28 @@ def desktop(browser):
     expect(folders(page)).to_have_text([re.compile(r"^Inbox\d*$"), "Sent"])
     page.keyboard.press("+")
 
+    # Spam, after the trash: I takes a wrongly caught mail back to the inbox.
+    for _ in range(3):
+        page.keyboard.press("J")
+    expect(page.locator("#list-title")).to_contain_text("Spam")
+    expect(rows(page)).to_have_count(1)
+    expect(rows(page).first).to_contain_text("You won!")
+    page.keyboard.press("I")
+    expect(page.locator(".toast")).to_contain_text("Moved to the inbox")
+    expect(rows(page)).to_have_count(0)
+    expect(page.locator("#thread-list")).to_contain_text("No spam.")
+    page.keyboard.press("z")
+    expect(rows(page)).to_have_count(1)
+
     # An own folder (a Gmail label), nested.
-    for _ in range(4):
+    for _ in range(2):
         page.keyboard.press("J")
     expect(page.locator("#list-title")).to_contain_text("Robotics")
     expect(rows(page)).to_have_count(1)
     expect(rows(page).first).to_contain_text("Motor driver datasheet")
 
     # Star and read state, in the inbox.
-    for _ in range(6):
+    for _ in range(7):
         page.keyboard.press("K")
     expect(page.locator("#list-title")).to_contain_text("Inbox")
     expect(rows(page)).to_have_count(4)

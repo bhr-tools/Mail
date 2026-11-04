@@ -17,7 +17,7 @@ type Query struct {
 
 // ParseQuery reads a search: words, "quoted phrases" and filters
 // (from:, to:, in:, account:, is:unread, is:starred, has:attachment).
-// Everything but the trash is searched unless in: says otherwise; in: also
+// Everything but the trash and spam is searched unless in: says otherwise; in: also
 // takes the name of a folder made by the person (in:Receipts).
 func ParseQuery(s string) Query {
 	var q Query
@@ -42,6 +42,8 @@ func ParseQuery(s string) Query {
 					q.all = true
 				case "done", "archived":
 					q.Roles = []string{config.Archive}
+				case "spam":
+					q.Roles = []string{config.Junk}
 				default:
 					if isRole(v) {
 						q.Roles = []string{v}
@@ -74,7 +76,7 @@ func ParseQuery(s string) Query {
 		terms = append(terms, term)
 	}
 	if q.Roles == nil && !q.all {
-		q.ExcludeRoles = []string{config.Trash}
+		q.ExcludeRoles = []string{config.Trash, config.Junk}
 	}
 	q.Match = strings.Join(terms, " ")
 	q.Text = strings.Join(words, " ")
