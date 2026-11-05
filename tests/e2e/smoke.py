@@ -143,8 +143,8 @@ def desktop(browser):
     page.keyboard.press("t")
     expect(card.locator("iframe.mail-frame")).to_be_visible()
 
-    # d: done. The reader moves on to the next conversation; z undoes.
-    page.keyboard.press("d")
+    # Shift+A: done. The reader moves on to the next conversation; z undoes.
+    page.keyboard.press("A")
     expect(page.locator(".toast")).to_contain_text("Archived")
     expect(rows(page)).to_have_count(3)
     expect(page.locator(".reader-subject")).to_have_text("Invoice for the gala hall")
@@ -157,6 +157,19 @@ def desktop(browser):
     expect(page.locator("#list-title")).to_contain_text("Inbox")
     page.keyboard.press("z")
     expect(page.locator(".toast")).to_contain_text("Undone")
+    expect(rows(page)).to_have_count(4)
+
+    # Space selects and moves on to the next; d trashes the selection.
+    page.keyboard.press("g")
+    page.keyboard.press("g")
+    page.keyboard.press(" ")
+    page.keyboard.press(" ")
+    expect(page.locator(".thread-row.selected")).to_have_count(2)
+    expect(rows(page).nth(2)).to_have_class(re.compile("cursor"))
+    page.keyboard.press("d")
+    expect(page.locator(".toast")).to_contain_text("Moved to the trash · 2 conversations")
+    expect(rows(page)).to_have_count(2)
+    page.keyboard.press("z")
     expect(rows(page)).to_have_count(4)
 
     # Attachments open from the reader.

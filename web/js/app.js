@@ -511,6 +511,8 @@ class App {
     else this.state.selected.add(key);
     updateRows(this);
     this.renderStatus();
+    // As in most mail clients, the cursor then moves on to the next one.
+    this.move(1);
   }
 
   // -------------------------------------------------------------------------
@@ -848,13 +850,13 @@ class App {
           row(['&', 'é', '"', "'"], 'Each account')),
         h('section', null,
           h('h3', { class: 'field-label' }, 'Act'),
-          row(['d'], 'Done (archive)'),
-          row(['D'], 'Trash'),
+          row(['A'], 'Done (archive)'),
+          row(['d'], 'Trash'),
           row(['I'], 'Back to the inbox'),
           row(['u'], 'Read / unread'),
           row(['s'], 'Star'),
           row(['m'], 'Move to a folder'),
-          row(['Space'], 'Select'),
+          row(['Space'], 'Select and go to the next'),
           row(['z'], 'Undo'),
           h('h3', { class: 'field-label' }, 'Write and read'),
           row(['c'], 'New message'),

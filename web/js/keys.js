@@ -80,8 +80,8 @@ export function initKeys(app) {
       case '+': app.toggleCurrentSection(); return true;
       case 'Enter': app.enter(); return true;
       case 'o': app.openAttachment(); return true;
-      case 'd': app.act('done'); return true;
-      case 'D': case '#': case 'Delete': app.act('trash'); return true;
+      case 'A': app.act('done'); return true;
+      case 'd': case '#': case 'Delete': app.act('trash'); return true;
       case 'I': app.act('inbox'); return true;
       case 'u': app.toggleRead(); return true;
       case 's': app.toggleStar(); return true;

@@ -5,7 +5,7 @@ A minimalist, self-hosted mail client in the spirit of Get Done, Focus and Calen
 - **Your accounts, one place:** Gmail (with an app password), any IMAP/SMTP server. One account at a time. Your own folders and Gmail labels are there too.
 - **Minimal sidebar:** each account folds to its inbox; unfold it to reach the other folders. Drag an account by its name to reorder the accounts (kept on the server, so every device shows the same order).
 - **Images, safely:** HTML mail is shown as designed (on a phone, a layout made for a desktop is scaled down to the width of the screen), in a frame that runs no script and loads nothing from the internet. Remote images, which tell senders when you read, stay hidden until you press `i`, and then go through the server, so senders never see your address. Senders can be trusted for good.
-- **Done means archived:** `d` takes a conversation out of the inbox, `z` brings it back. Actions show at once and reach the server in the background.
+- **Done means archived:** `A` takes a conversation out of the inbox, `z` brings it back. Actions show at once and reach the server in the background.
 - **Conversations:** the reader always shows the conversation under the cursor, every message unfolded; replies are grouped with the messages they answer, your own answers (from Sent) included. Quotes are folded. A conversation counts as read once it has been shown a second.
 - **Plain text writing:** reply, reply all, forward (with the attachments), drafts kept on the server, addresses completed from the people you write to. A missing attachment is caught before sending.
 - **Full Vim navigation:** fully operable from the keyboard, AZERTY included.
@@ -25,12 +25,12 @@ Press `?` in the app to show the cheatsheet.
 | `J` / `K` | Next / previous folder of the sidebar, as in aerc |
 | `+` | Fold / unfold the account: inbox only, or every folder |
 | `&` `é` `"` `'` | Each account |
-| `d` | Done: archive |
-| `D` (or `#`) | Trash |
+| `A` | Done: archive |
+| `d` (or `#`) | Trash |
 | `I` | Back to the inbox |
 | `u` / `s` | Read / unread, star |
 | `m` | Move to a folder (type to filter) |
-| `Space` | Select, then act on the selection |
+| `Space` | Select and go to the next, then act on the selection |
 | `z` | Undo |
 | `c` | New message |
 | `r` / `R` / `f` | Reply / reply all / forward |
