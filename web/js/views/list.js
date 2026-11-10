@@ -6,21 +6,39 @@ import { deferWhileSwiping, swipeable } from '../ui/swipe.js';
 
 export const threadKey = (t) => `${t.account}\u0000${t.thread}`;
 
-function people(app, t) {
+function people(app, t, inSearch) {
   const { role } = app.state.view;
   // In sent mail and drafts, who it was written to matters.
-  if (!app.state.search && (role === 'sent' || role === 'drafts')) {
+  if (!inSearch && (role === 'sent' || role === 'drafts')) {
     const to = t.latest.to.map(personName).join(', ');
     return to ? `To: ${to}` : '(no recipient)';
   }
   return t.people.length ? t.people.join(', ') : personName(t.latest.from);
 }
 
+/** What a row shows: the people, the subject, the snippet and the date. */
+export function rowContent(app, t, { showAccount = false, inSearch = !!app.state.search } = {}) {
+  const account = app.accountOf(t.account);
+  return [
+    h('span', { class: 'unread-dot' }),
+    h('div', { class: 'row-top' },
+      h('span', { class: 'row-from' }, people(app, t, inSearch)),
+      t.count > 1 ? h('span', { class: 'row-count' }, t.count) : null),
+    h('span', { class: 'row-date', title: new Date(t.date).toLocaleString() }, shortDate(t.date)),
+    h('div', { class: 'row-subject' },
+      showAccount && account ? h('span', { class: ['account-tag', `acc-${app.colorOf(t.account)}`] }, account.name) : null,
+      h('span', { class: 'row-subject-text' }, t.latest.subject || '(no subject)'),
+      h('span', { class: 'row-icons' },
+        t.attachments ? icon('paperclip') : null,
+        t.flagged ? icon('star') : null)),
+    h('div', { class: 'row-snippet' }, t.latest.snippet || ' '),
+  ];
+}
+
 function row(app, t, index) {
   const key = threadKey(t);
   const { cursor, selected, open } = app.state;
   const showAccount = app.state.accounts.length > 1 && !!app.state.search;
-  const account = app.accountOf(t.account);
   const el = h('div', {
     class: ['thread-row', t.unread > 0 && 'unread', index === cursor && 'cursor', selected.has(key) && 'selected', open === key && 'open'],
     attrs: { role: 'option', 'aria-selected': String(index === cursor) },
@@ -34,19 +52,7 @@ function row(app, t, index) {
       app.setCursor(index);
       app.openCursor();
     },
-  },
-  h('span', { class: 'unread-dot' }),
-  h('div', { class: 'row-top' },
-    h('span', { class: 'row-from' }, people(app, t)),
-    t.count > 1 ? h('span', { class: 'row-count' }, t.count) : null),
-  h('span', { class: 'row-date', title: new Date(t.date).toLocaleString() }, shortDate(t.date)),
-  h('div', { class: 'row-subject' },
-    showAccount && account ? h('span', { class: ['account-tag', `acc-${app.colorOf(t.account)}`] }, account.name) : null,
-    h('span', { class: 'row-subject-text' }, t.latest.subject || '(no subject)'),
-    h('span', { class: 'row-icons' },
-      t.attachments ? icon('paperclip') : null,
-      t.flagged ? icon('star') : null)),
-  h('div', { class: 'row-snippet' }, t.latest.snippet || ' '));
+  }, ...rowContent(app, t, { showAccount }));
   // On a phone: swipe left to throw away, right to move.
   const role = app.roleOf(t);
   return swipeable(el, {
@@ -76,14 +82,14 @@ export function renderList(app) {
 }
 
 export function scrollToCursor(app) {
-  const el = document.querySelector(`.thread-row[data-index="${app.state.cursor}"]`);
+  const el = document.querySelector(`#thread-list .thread-row[data-index="${app.state.cursor}"]`);
   el?.scrollIntoView({ block: 'nearest' });
 }
 
 /** Updates the highlighted rows without rebuilding the list. */
 export function updateRows(app) {
   const { cursor, selected, open, threads } = app.state;
-  for (const el of document.querySelectorAll('.thread-row')) {
+  for (const el of document.querySelectorAll('#thread-list .thread-row')) {
     const i = Number(el.dataset.index);
     const t = threads[i];
     if (!t) continue;

@@ -30,8 +30,7 @@ export function initKeys(app) {
       }
       if (isTextInput(document.activeElement)) {
         e.preventDefault();
-        if (document.activeElement.id === 'search-input') app.closeSearch();
-        else document.activeElement.blur();
+        document.activeElement.blur();
         return;
       }
     }

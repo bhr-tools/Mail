@@ -8,6 +8,7 @@ import { folderLabel, navigation, renderSidebar } from './views/sidebar.js';
 import { renderList, threadKey, updateRows } from './views/list.js';
 import { renderBody, renderReader, scrollToFocused } from './views/reader.js';
 import { openCompose } from './views/compose.js';
+import { describeQuery, openSearchPage } from './views/search.js';
 import { initKeys } from './keys.js';
 import { edgeSwipe, pullToRefresh } from './ui/swipe.js';
 
@@ -61,6 +62,8 @@ class App {
     };
     // Accounts showing every folder; the others show their inbox only.
     this.expanded = new Set(readJSON(prefs.get('expanded', '[]')));
+    // The last query of the search page, to pick it up again.
+    this.lastQuery = '';
     this.listSeq = 0;
     this.watching = false;
     this.handleKey = () => {};
@@ -272,7 +275,7 @@ class App {
     const { view, search, accounts } = this.state;
     const title = $('list-title');
     if (search) {
-      title.replaceChildren('Search ', h('span', { class: 'muted' }, search.query));
+      title.replaceChildren('Search ', h('span', { class: 'muted' }, describeQuery(this, search.query)));
     } else {
       const account = this.accountOf(view.account);
       const suffix = accounts.length > 1 && account ? account.name : '';
@@ -320,7 +323,6 @@ class App {
     this.state.view = { role, account: this.state.accounts.length > 1 ? account : '' };
     prefs.set('account', this.state.view.account);
     this.state.search = null;
-    $('search-bar').hidden = true;
     this.state.cursor = 0;
     this.state.selected.clear();
     this.closeReader();
@@ -762,31 +764,32 @@ class App {
   // Search
   // -------------------------------------------------------------------------
 
+  /** / : the search page, on the last search. */
   openSearch() {
-    const bar = $('search-bar');
-    const input = $('search-input');
-    bar.hidden = false;
-    input.value = this.state.search?.query || '';
-    input.focus();
-    input.select();
+    if (topModal()) return;
+    openSearchPage(this, { query: this.lastQuery });
   }
 
-  runSearch(query) {
+  /** Shows the results of a query in the list; open: a conversation to open. */
+  async runSearch(query, { open = null } = {}) {
     query = query.trim();
     if (!query) return this.closeSearch();
+    this.lastQuery = query;
     this.state.search = { query };
     this.state.cursor = 0;
     this.state.selected.clear();
     this.closeReader();
     renderSidebar(this);
     this.renderTitle();
-    $('search-input').blur();
-    this.loadThreads();
+    await this.loadThreads();
+    if (!open || this.state.search?.query !== query) return;
+    const i = this.state.threads.findIndex((t) => threadKey(t) === threadKey(open));
+    if (i < 0) return;
+    this.setCursor(i);
+    this.openCursor();
   }
 
   closeSearch() {
-    $('search-bar').hidden = true;
-    $('search-input').blur();
     if (!this.state.search) return;
     this.state.search = null;
     this.state.cursor = 0;
@@ -796,14 +799,14 @@ class App {
     this.loadThreads();
   }
 
-  async searchServer() {
-    const query = this.state.search?.query;
+  /** Looks on the servers for older mail matching the words of a query. */
+  async searchServer(query = this.state.search?.query) {
     if (!query) return;
     toast('Searching the servers…');
     try {
       const { found } = await api.searchServer(query);
       toast(found ? `${found} found on the servers` : 'Nothing more on the servers');
-      await this.loadThreads({ keep: true });
+      if (this.state.search) await this.loadThreads({ keep: true });
     } catch (err) {
       toast(err.message, { type: 'error' });
     }
@@ -843,7 +846,11 @@ class App {
           row(['g', 'g'], 'First conversation'),
           row(['G'], 'Last conversation'),
           row(['Ctrl', 'd'], 'Scroll the conversation down (Ctrl u: up)'),
-          row(['/'], 'Search'),
+          h('h3', { class: 'field-label' }, 'Search'),
+          row(['/'], 'Search, with filters (account, folder…)'),
+          row(['↓', '↑'], 'Through the results (j k outside the fields)'),
+          row(['Enter'], 'Open the conversation'),
+          row(['Ctrl', 'Enter'], 'Show the results in the list'),
           h('h3', { class: 'field-label' }, 'Folders'),
           row(['J', 'K'], 'Next / previous folder'),
           row(['+'], 'Fold / unfold the account'),
@@ -1046,12 +1053,6 @@ class App {
     $('status-sync').addEventListener('click', () => {
       const failed = this.state.accounts.filter((a) => a.status.state === 'error');
       if (failed.length) toast(failed.map((a) => `${a.name}: ${a.status.error}`).join(' · '), { type: 'error' });
-    });
-    $('search-input').addEventListener('keydown', (e) => {
-      if (e.key === 'Enter') {
-        e.preventDefault();
-        this.runSearch(e.target.value);
-      }
     });
     $('settings-menu').addEventListener('click', () => openMenu($('settings-menu'), [
       { label: 'Check for new mail', icon: 'refresh', run: () => this.syncNow() },

@@ -27,11 +27,11 @@ def shot(page, name):
 
 
 def rows(page):
-    return page.locator(".thread-row")
+    return page.locator("#thread-list .thread-row")
 
 
 def row(page, subject):
-    return page.locator(".thread-row", has_text=subject)
+    return page.locator("#thread-list .thread-row", has_text=subject)
 
 
 def frame_of(page, card):
@@ -246,17 +246,55 @@ def desktop(browser):
     expect(row(page, "Re: Lab report review").locator(".row-count")).to_have_text("2")
     expect(row(page, "Re: Lab report review")).to_contain_text("To: Camille Martin")
 
-    # Search, with a filter.
+    # Search: a page of its own, results as you type.
+    search = page.locator(".search-page")
+    hits = page.locator(".search-hit")
+    folder = page.locator(".search-select")
     page.keyboard.press("/")
+    expect(search).to_be_visible()
     page.keyboard.type("invoice")
-    page.keyboard.press("Enter")
+    expect(hits).to_have_count(1)
+    expect(hits.first).to_contain_text("Invoice for the gala hall")
+    shot(page, "search")
+    # The folder filter: the invoice is in the inbox, not the archive.
+    folder.select_option("archive")
+    expect(hits).to_have_count(0)
+    expect(search).to_contain_text("No conversation matches.")
+    folder.select_option("")
+    expect(hits).to_have_count(1)
+    # Ctrl+Enter: the results in the list, to act on them.
+    page.keyboard.press("Control+Enter")
+    expect(search).to_have_count(0)
     expect(page.locator("#list-title")).to_contain_text("invoice")
     expect(rows(page)).to_have_count(1)
+    # The period, then Enter opens a result.
     page.keyboard.press("/")
-    page.keyboard.press("Control+a")
-    page.keyboard.type("from:camille is:unread")
+    expect(page.locator("#search-input")).to_have_value("invoice")
+    page.locator("#search-input").fill("kickoff")
+    expect(hits).to_have_count(1)
+    search.get_by_role("button", name="30 days").click()
+    expect(hits).to_have_count(0)
+    search.get_by_role("button", name="Any time").click()
+    expect(hits).to_have_count(1)
+    page.locator("#search-input").focus()
+    page.keyboard.press("ArrowDown")
+    expect(hits.first).to_have_class(re.compile("cursor"))
     page.keyboard.press("Enter")
-    expect(rows(page)).to_have_count(0)
+    expect(search).to_have_count(0)
+    expect(page.locator(".reader-subject")).to_have_text("Project kickoff")
+    expect(page.locator("#list-title")).to_contain_text("kickoff")
+    # Typed filters still work, and fill the form when it opens again.
+    page.keyboard.press("/")
+    page.locator("#search-input").fill("from:camille is:unread")
+    expect(search).to_contain_text("No conversation matches.")
+    page.keyboard.press("Escape")
+    expect(search).to_have_count(0)
+    page.keyboard.press("/")
+    expect(page.locator("#search-input")).to_have_value("")
+    expect(page.locator(".search-person").first).to_have_value("camille")
+    expect(search.locator(".search-chip.on")).to_have_text(["Unread"])
+    page.keyboard.press("Escape")
+    # Escape leaves the results for the folder.
     page.keyboard.press("Escape")
     expect(page.locator("#list-title")).to_contain_text("Sent")
 
@@ -327,6 +365,14 @@ def phone(browser):
     page.get_by_role("button", name="Unlock").click()
     expect(rows(page).first).to_be_visible()
     shot(page, "08-phone-list")
+    # The search page fills the screen; nothing spills sideways.
+    page.locator("#search-button").tap()
+    page.locator("#search-input").fill("lab")
+    expect(page.locator(".search-hit")).to_have_count(1)
+    assert page.evaluate("document.documentElement.scrollWidth <= window.innerWidth"), "search page wider than the phone"
+    shot(page, "08c-phone-search")
+    page.locator(".search-header .icon-button").tap()
+    expect(page.locator(".search-page")).to_have_count(0)
     count = rows(page).count()
     rows(page).first.tap()
     expect(page.locator(".reader-title")).to_be_visible()

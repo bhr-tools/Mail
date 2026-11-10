@@ -128,6 +128,50 @@ func TestQuery(t *testing.T) {
 	if q := ParseQuery("in:Receipts"); len(q.Roles) != 1 || q.Roles[0] != "folder:Receipts" {
 		t.Errorf("own folder = %v", q.Roles)
 	}
+	if q := ParseQuery(`in:"My receipts"`); len(q.Roles) != 1 || q.Roles[0] != "folder:My receipts" {
+		t.Errorf("quoted folder = %v", q.Roles)
+	}
+	now := time.Date(2026, 3, 31, 12, 0, 0, 0, time.UTC)
+	for in, want := range map[string]time.Time{
+		"newer:7d":         now.AddDate(0, 0, -7),
+		"newer:2w":         now.AddDate(0, 0, -14),
+		"newer:1m":         now.AddDate(0, -1, 0),
+		"newer:1y":         now.AddDate(-1, 0, 0),
+		"after:2026-01-15": time.Date(2026, 1, 15, 0, 0, 0, 0, time.UTC),
+	} {
+		if q := parseQuery(in, now); !q.After.Equal(want) || q.Match != "" {
+			t.Errorf("%s: after = %v, match = %q", in, q.After, q.Match)
+		}
+	}
+	// A filter it can't read is looked for as words.
+	if q := parseQuery("newer:soon", now); !q.After.IsZero() || q.Text != "newer:soon" {
+		t.Errorf("bad span: after = %v, text = %q", q.After, q.Text)
+	}
+}
+
+func TestSearchByDate(t *testing.T) {
+	_, store := setup(t)
+	count := func(q string) int {
+		t.Helper()
+		list, err := store.Threads(ParseQuery(q).Filter)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return len(list)
+	}
+	// The lab report thread is from the last few days; the kickoff is 40 days old.
+	if n := count("in:archive"); n < 2 {
+		t.Fatalf("archive = %d", n)
+	}
+	if n := count("in:archive newer:30d"); n != count("in:archive")-1 {
+		t.Errorf("archive newer than 30 days = %d", n)
+	}
+	if n := count("lab newer:7d"); n != 1 {
+		t.Errorf("lab newer than 7 days = %d", n)
+	}
+	if n := count("lab newer:1d"); n != 0 {
+		t.Errorf("lab newer than a day = %d", n)
+	}
 }
 
 func itoa(n int64) string {

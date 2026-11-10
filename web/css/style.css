@@ -319,6 +319,79 @@ select.input { cursor: pointer; }
 .picker-meta { flex-shrink: 0; color: var(--rp-muted); font-size: 0.78rem; font-variant-numeric: tabular-nums; }
 .picker-empty { padding: 14px 12px; color: var(--rp-muted); font-size: 0.86rem; }
 
+/* Search: a full-screen page, as in the calendar */
+.modal-overlay:has(.search-page) { padding: 0; }
+.modal.search-page {
+  --inset: max(16px, calc((100% - 880px) / 2));
+  width: 100%;
+  height: 100dvh;
+  max-height: none;
+  border: none;
+  border-radius: 0;
+  background: var(--rp-base);
+}
+.modal.search-page .modal-body { flex: 1; gap: 0; padding: 0; overflow: hidden; }
+.search-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: max(10px, env(safe-area-inset-top)) var(--inset) 10px;
+  border-bottom: 1px solid var(--border);
+  background: var(--rp-surface);
+}
+.search-header .picker-search { flex: 1; min-width: 0; padding: 4px 6px; border: none; }
+.search-count { flex-shrink: 0; color: var(--rp-muted); font-size: 0.8rem; font-variant-numeric: tabular-nums; }
+.search-filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 14px;
+  padding: 10px var(--inset);
+  border-bottom: 1px solid var(--border);
+}
+.search-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.search-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 28px;
+  padding: 0 10px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  color: var(--rp-subtle);
+  font-size: 0.78rem;
+}
+.search-chip:hover { color: var(--rp-text); }
+.search-chip.on { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 14%, transparent); color: var(--rp-text); font-weight: 600; }
+.search-chip.on[class*="acc-"] { border-color: var(--acc); background: color-mix(in srgb, var(--acc) 16%, transparent); }
+.search-chip .account-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--acc); }
+.search-field { display: inline-flex; align-items: center; gap: 6px; color: var(--rp-muted); }
+.search-select { width: auto; max-width: 260px; height: 30px; padding: 0 8px; font-size: 0.82rem; }
+.search-people { display: flex; flex-wrap: wrap; gap: 6px; }
+.search-person { width: 170px; height: 30px; padding: 0 8px; font-size: 0.82rem; }
+.search-results { flex: 1; min-height: 0; padding: 0 var(--inset) calc(24px + env(safe-area-inset-bottom)); overflow-y: auto; }
+.search-month {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  padding: 14px 4px 6px;
+  background: var(--rp-base);
+  color: var(--rp-muted);
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+.search-hit { border-radius: 6px; border-bottom: none; }
+.search-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 4px 12px; padding-top: 8px; }
+.search-actions .list-more { width: auto; }
+.search-actions kbd { margin-left: 2px; }
+@media (max-width: 768px) {
+  .search-people { width: 100%; }
+  .search-person { flex: 1; width: auto; min-width: 0; font-size: 16px; }
+  .search-actions kbd { display: none; }
+}
+
 /* ==========================================================================
    Layout
    ========================================================================== */
@@ -454,10 +527,6 @@ select.input { cursor: pointer; }
   white-space: nowrap;
 }
 .list-title .muted { color: var(--rp-muted); font-weight: 500; }
-
-.search-bar { display: flex; align-items: center; gap: 8px; padding: 8px 10px 8px 16px; border-bottom: 1px solid var(--border); color: var(--rp-muted); }
-.search-input { flex: 1; min-width: 0; height: 32px; border: none; background: transparent; color: var(--rp-text); font-size: 0.92rem; outline: none; }
-.search-input::placeholder { color: var(--rp-muted); }
 
 .thread-list { flex: 1; min-height: 0; overflow-y: auto; }
 .thread-row {
@@ -699,7 +768,7 @@ select.compose-input { cursor: pointer; }
 
 @media (max-width: 768px) {
   /* 16px text keeps iOS Safari from zooming into focused fields. */
-  .input, .search-input, .compose-input, .compose-body { font-size: 16px; }
+  .input, .picker-input, .compose-input, .compose-body { font-size: 16px; }
 
   .sidebar {
     position: fixed;

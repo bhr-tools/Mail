@@ -38,13 +38,13 @@ Press `?` in the app to show the cheatsheet.
 | `i` | Show the remote images |
 | `t` | Plain text / formatted |
 | `o` | Open an attachment |
-| `/` | Search: words, `from:`, `to:`, `is:unread`, `is:starred`, `has:attachment`, `in:archive`, `in:spam`, `in:Receipts`, `in:all`, `account:` |
+| `/` | Search page: results as you type, filters for the account, folder, unread / starred / attachment, period, from and to. ↓ ↑ (or `j` `k` outside the fields) and Enter open a result; Ctrl+Enter shows the results in the list, to act on several. The filters can also be typed: `from:`, `to:`, `account:`, `in:archive`, `in:spam`, `in:Receipts`, `in:all`, `is:unread`, `is:starred`, `has:attachment`, `newer:7d` (`d`, `w`, `m`, `y`), `after:2026-01-31` |
 | `Ctrl+Enter` / `Ctrl+S` | Send / save the draft (in the composer) |
 | `Esc` | Close (an unsent message is kept as a draft) |
 
 ## How it works
 
-The server keeps a copy of each account in SQLite: the inbox and drafts whole, the archive, sent mail, trash, spam and your own folders for the last year (`-window`). Gmail's system folders (Important, Starred…) are left out. Older mail is found with **Search older mail on the servers** at the end of search results. One connection per account waits in IMAP IDLE on the inbox, so new mail shows within seconds; the other folders are checked every five minutes. Flags changed elsewhere (read on a phone) follow, with CONDSTORE when the server has it.
+The server keeps a copy of each account in SQLite: the inbox and drafts whole, the archive, sent mail, trash, spam and your own folders for the last year (`-window`). Gmail's system folders (Important, Starred…) are left out. Older mail is found with **Search older mail on the servers** at the end of the search page. One connection per account waits in IMAP IDLE on the inbox, so new mail shows within seconds; the other folders are checked every five minutes. Flags changed elsewhere (read on a phone) follow, with CONDSTORE when the server has it.
 
 Actions done in the app (done, trash, read, star, move) are applied to the local copy at once and queued for the server; a refused action is tried again, then undone with a message in the status bar. The folders of each role (inbox, archive, sent, drafts, trash, spam) are found from the server's special-use attributes (Gmail's All Mail is the archive) or usual names, and can be set by hand.
 
