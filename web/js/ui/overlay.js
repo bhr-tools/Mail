@@ -14,7 +14,7 @@ let popover = null; // { el, backdrop, anchor, onClose }
  * Shows `content` next to `anchor` (desktop) or as a bottom sheet (phone).
  * Only one popover is open at a time. Returns a function closing it.
  */
-export function openPopover(anchor, content, { onClose, title, className = '' } = {}) {
+export function openPopover(anchor, content, { onClose, title, className = '', point = null } = {}) {
   closePopover();
   const sheet = isMobile();
   const el = h('div', { class: ['popover', sheet && 'sheet', className], attrs: { role: 'dialog' } },
@@ -25,7 +25,11 @@ export function openPopover(anchor, content, { onClose, title, className = '' } 
   if (backdrop) document.body.append(backdrop);
   document.body.append(el);
   popover = { el, backdrop, anchor, onClose };
-  if (!sheet) positionPopover(el, anchor);
+  if (!sheet) {
+    // A context menu opens where the pointer is.
+    const at = point && { getBoundingClientRect: () => ({ left: point.x, right: point.x, top: point.y, bottom: point.y, width: 0, height: 0 }) };
+    positionPopover(el, at || anchor);
+  }
   anchor?.classList.add('is-open');
   return closePopover;
 }
@@ -94,6 +98,16 @@ export function menuList(items) {
 /** Opens a menu of items under anchor. */
 export function openMenu(anchor, items, options) {
   return openPopover(anchor, menuList(items), options);
+}
+
+/**
+ * Opens the app's own menu in place of the browser's, at the pointer of a
+ * contextmenu event (a bottom sheet on phones).
+ */
+export function openContextMenu(e, items, options = {}) {
+  e.preventDefault();
+  e.stopPropagation();
+  return openPopover(null, menuList(items.filter(Boolean)), { ...options, point: { x: e.clientX, y: e.clientY } });
 }
 
 // ---------------------------------------------------------------------------
@@ -222,7 +236,9 @@ export function promptDialog(title, { value = '', placeholder = '', okText = 'Sa
       ],
       onClose: () => resolve(answer),
     });
-    requestAnimationFrame(() => input.select());
+    // At once: a frame later, the first letters typed would be selected and
+    // replaced.
+    input.select();
   });
 }
 

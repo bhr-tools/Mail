@@ -46,6 +46,7 @@ async function request(method, path, body, { signal } = {}) {
 const get = (path, opts) => request('GET', path, undefined, opts);
 const post = (path, body = {}) => request('POST', path, body);
 const put = (path, body = {}) => request('PUT', path, body);
+const del = (path, body = {}) => request('DELETE', path, body);
 const enc = encodeURIComponent;
 
 function outgoing(message, files) {
@@ -68,6 +69,10 @@ export const api = {
   accounts: () => get('/api/accounts'),
   setAccountOrder: (accounts) => put('/api/accounts/order', { accounts }),
   folders: (account) => get(`/api/accounts/${enc(account)}/folders`),
+  /** parent: role of the folder it goes in ('' for the top). Resolves to { role }. */
+  createFolder: (account, name, parent = '') => post(`/api/accounts/${enc(account)}/folders`, { name, parent }),
+  renameFolder: (account, role, name) => put(`/api/accounts/${enc(account)}/folders`, { role, name }),
+  deleteFolder: (account, role) => del(`/api/accounts/${enc(account)}/folders`, { role }),
   sync: (account = 'all') => post(`/api/accounts/${enc(account)}/sync`),
   /** Resolves once the mail changed after `since` (or after ~50 s). */
   changes: (since, signal) => get(`/api/changes?since=${since}`, { signal }),

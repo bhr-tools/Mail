@@ -52,6 +52,7 @@ function row(app, t, index) {
       app.setCursor(index);
       app.openCursor();
     },
+    oncontextmenu: (e) => app.threadMenu(e, t, index),
   }, ...rowContent(app, t, { showAccount }));
   // On a phone: swipe left to throw away, right to move.
   const role = app.roleOf(t);

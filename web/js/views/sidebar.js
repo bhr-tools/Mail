@@ -22,13 +22,14 @@ function depth(role) {
   return isCustom(role) ? role.slice(CUSTOM.length).split('/').length - 1 : 0;
 }
 
-function folderRow(app, { label, iconName, count, unread, active, run, hint, indent = 0 }) {
+function folderRow(app, { label, iconName, count, unread, active, run, menu, hint, indent = 0, className }) {
   return h('button', {
     type: 'button',
-    class: ['folder-row', active && 'active', unread && 'has-unread'],
+    class: ['folder-row', active && 'active', unread && 'has-unread', className],
     title: hint || label,
     style: indent ? { '--indent': indent } : undefined,
     onclick: () => { run(); app.closeSidebar(); },
+    oncontextmenu: menu,
   }, icon(iconName), h('span', { class: 'folder-name' }, label), count ? h('span', { class: 'folder-count' }, count) : null);
 }
 
@@ -83,7 +84,17 @@ export function renderSidebar(app) {
       indent: depth(f.role),
       hint: `${f.name}${several ? ` · ${owner.name}` : ''}`,
       run: () => app.setView(f.role, item.account),
+      menu: (e) => app.folderMenu(e, item.owner, f),
     }));
+    // Under an unfolded account's last folder: a way to make one.
+    const next = items[items.indexOf(item) + 1];
+    if (app.isExpanded(owner.id) && next?.owner !== owner) {
+      const account = owner;
+      rows.push(folderRow(app, {
+        label: 'New folder', iconName: 'plus', className: 'new-folder',
+        run: () => app.newFolder(account.id),
+      }));
+    }
   }
   nav.replaceChildren(...rows);
 }
@@ -100,6 +111,7 @@ function sectionHeader(app, a) {
       app.toggleExpanded(a.id);
     },
     onpointerdown: (e) => startDrag(app, e, a.id),
+    oncontextmenu: (e) => app.accountMenu(e, a),
   },
   h('span', { class: 'account-dot' }),
   h('span', { class: 'nav-section-name' }, a.name),

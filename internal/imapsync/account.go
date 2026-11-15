@@ -55,12 +55,17 @@ type Account struct {
 
 	wake chan struct{}
 
+	// listing serializes the listings of folders with the changes made to
+	// them: a listing taken before a change must not be saved after it.
+	listing sync.Mutex
+
 	mu       sync.Mutex
 	status   Status
 	roles    map[string]bool // folders to synchronize at the next wake
 	full     bool
 	resolved bool
 	all      []string // every folder of the account
+	delim    rune     // separator of folder levels ("/" or "."), 0 if flat
 }
 
 // Manager runs the accounts.
@@ -303,6 +308,12 @@ var specialUse = map[imap.MailboxAttr]string{
 
 // resolveFolders finds the folder of each role and lists the others.
 func (a *Account) resolveFolders(c *imapclient.Client) error {
+	a.listing.Lock()
+	defer a.listing.Unlock()
+	return a.resolveFoldersLocked(c)
+}
+
+func (a *Account) resolveFoldersLocked(c *imapclient.Client) error {
 	var options *imap.ListOptions
 	if c.Caps().Has(imap.CapListExtended) && c.Caps().Has(imap.CapSpecialUse) {
 		options = &imap.ListOptions{ReturnSpecialUse: true}
@@ -316,7 +327,11 @@ func (a *Account) resolveFolders(c *imapclient.Client) error {
 	var all []string
 	// Candidates for the person's own folders: not special, not system.
 	var own []string
+	var delim rune
 	for _, l := range list {
+		if delim == 0 && l.Delim != 0 {
+			delim = l.Delim
+		}
 		selectable := true
 		special := false
 		for _, attr := range l.Attrs {
@@ -410,6 +425,7 @@ func (a *Account) resolveFolders(c *imapclient.Client) error {
 	sort.Strings(all)
 	a.mu.Lock()
 	a.all = all
+	a.delim = delim
 	a.resolved = true
 	a.mu.Unlock()
 	return nil

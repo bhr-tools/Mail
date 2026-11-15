@@ -57,6 +57,9 @@ func (a *API) Handler() http.Handler {
 	auth("GET /api/accounts", a.accounts)
 	auth("PUT /api/accounts/order", a.setAccountOrder)
 	auth("GET /api/accounts/{account}/folders", a.folders)
+	auth("POST /api/accounts/{account}/folders", a.createFolder)
+	auth("PUT /api/accounts/{account}/folders", a.renameFolder)
+	auth("DELETE /api/accounts/{account}/folders", a.deleteFolder)
 	auth("POST /api/accounts/{account}/sync", a.syncAccount)
 	auth("GET /api/changes", a.changes)
 

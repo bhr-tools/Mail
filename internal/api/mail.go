@@ -127,6 +127,63 @@ func (a *API) folders(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, acc.Folders())
 }
 
+type folderRequest struct {
+	Role   string `json:"role"`   // the folder renamed or deleted
+	Parent string `json:"parent"` // where a new folder goes ("" for the top)
+	Name   string `json:"name"`
+}
+
+func (a *API) folderRequest(w http.ResponseWriter, r *http.Request) (*imapsync.Account, *folderRequest, bool) {
+	acc, err := a.account(r, r.PathValue("account"))
+	if err != nil {
+		fail(w, r, err)
+		return nil, nil, false
+	}
+	var req folderRequest
+	if !decode(w, r, &req) {
+		return nil, nil, false
+	}
+	return acc, &req, true
+}
+
+func (a *API) createFolder(w http.ResponseWriter, r *http.Request) {
+	acc, req, ok := a.folderRequest(w, r)
+	if !ok {
+		return
+	}
+	role, err := acc.CreateFolder(req.Parent, req.Name)
+	if err != nil {
+		fail(w, r, serverError(err))
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]string{"role": role})
+}
+
+func (a *API) renameFolder(w http.ResponseWriter, r *http.Request) {
+	acc, req, ok := a.folderRequest(w, r)
+	if !ok {
+		return
+	}
+	role, err := acc.RenameFolder(req.Role, req.Name)
+	if err != nil {
+		fail(w, r, serverError(err))
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]string{"role": role})
+}
+
+func (a *API) deleteFolder(w http.ResponseWriter, r *http.Request) {
+	acc, req, ok := a.folderRequest(w, r)
+	if !ok {
+		return
+	}
+	if err := acc.DeleteFolder(req.Role); err != nil {
+		fail(w, r, serverError(err))
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]bool{"ok": true})
+}
+
 func (a *API) syncAccount(w http.ResponseWriter, r *http.Request) {
 	if id := r.PathValue("account"); id == "all" {
 		for _, acc := range a.mail.Accounts() {

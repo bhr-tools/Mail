@@ -39,7 +39,7 @@ def frame_of(page, card):
 
 
 def folders(page):
-    return page.locator("#folders .folder-row")
+    return page.locator("#folders .folder-row:not(.new-folder)")
 
 
 def rect(locator):
@@ -339,10 +339,50 @@ def desktop(browser):
     # m: move to a folder picked by typing.
     page.keyboard.press("m")
     page.keyboard.type("recei")
-    expect(page.locator(".picker-item")).to_have_count(1)
+    # The matching folder first; making one of that name, last.
+    expect(page.locator(".picker-item")).to_have_text(["Receipts", "New folder “recei”"])
     page.keyboard.press("Enter")
     expect(page.locator(".toast")).to_contain_text("Moved to Receipts")
     expect(rows(page)).to_have_count(3)
+
+    # m, then a name no folder has: the folder is made, the mail moved in.
+    page.keyboard.press("m")
+    page.keyboard.type("Travel")
+    expect(page.locator(".picker-item.create")).to_have_text("New folder “Travel”")
+    page.keyboard.press("Enter")
+    expect(page.locator(".toast")).to_contain_text("Moved to Travel")
+    expect(rows(page)).to_have_count(2)
+    expect(folders(page).filter(has_text="Travel")).to_have_count(1)
+
+    # Right click: the app's menu, not the browser's.
+    rows(page).first.click(button="right")
+    menu = page.locator(".popover .menu")
+    expect(menu).to_contain_text("Archive")
+    expect(menu).to_contain_text("Move to…")
+    shot(page, "06a-context-menu")
+    page.keyboard.press("Escape")
+    expect(menu).to_have_count(0)
+
+    # Folders: renamed and deleted from their own menu, made from the sidebar.
+    folders(page).filter(has_text="Travel").click(button="right")
+    page.locator(".menu-item", has_text="Rename").click()
+    # The name is selected: typed at once, it replaces it whole.
+    page.keyboard.type("Trips")
+    page.keyboard.press("Enter")
+    expect(folders(page).filter(has_text="Trips")).to_have_count(1)
+    expect(folders(page).filter(has_text="Travel")).to_have_count(0)
+    page.locator(".folder-row.new-folder").click()
+    page.keyboard.type("Empty")
+    page.keyboard.press("Enter")
+    expect(folders(page).filter(has_text="Empty")).to_have_count(1)
+    folders(page).filter(has_text="Empty").click(button="right")
+    page.locator(".menu-item", has_text="Delete").click()
+    page.get_by_role("button", name="Delete").click()
+    expect(page.locator(".toast")).to_contain_text("Folder Empty deleted")
+    expect(folders(page).filter(has_text="Empty")).to_have_count(0)
+    page.locator(".nav-section").click(button="right")
+    expect(page.locator(".popover .menu")).to_contain_text("New folder")
+    page.keyboard.press("Escape")
 
     page.keyboard.press("?")
     expect(page.locator(".modal.help")).to_be_visible()

@@ -18,6 +18,7 @@ import (
 	gomessage "github.com/emersion/go-message"
 
 	"github.com/bhr-tools/mail/internal/config"
+	"github.com/bhr-tools/mail/internal/db"
 )
 
 const dialTimeout = 20 * time.Second
@@ -117,7 +118,8 @@ func (c *conn) with(fn func(*imapclient.Client) error) error {
 	}
 	err := fn(c.client)
 	var imapErr *imap.Error
-	if err != nil && !errors.As(err, &imapErr) {
+	var refusal *db.ValidationError
+	if err != nil && !errors.As(err, &imapErr) && !errors.As(err, &refusal) {
 		// A network error: the connection is likely broken.
 		c.client.Close()
 		c.client = nil

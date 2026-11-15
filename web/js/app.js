@@ -3,8 +3,8 @@
 import { api, onUnauthorized } from './api.js';
 import { h, icon } from './dom.js';
 import { clock } from './format.js';
-import { closeAllModals, closePopover, openMenu, openModal, toast, topModal } from './ui/overlay.js';
-import { folderLabel, navigation, renderSidebar } from './views/sidebar.js';
+import { closeAllModals, closePopover, confirmDialog, openContextMenu, openMenu, openModal, promptDialog, toast, topModal } from './ui/overlay.js';
+import { folderLabel, isCustom, navigation, renderSidebar } from './views/sidebar.js';
 import { renderList, threadKey, updateRows } from './views/list.js';
 import { renderBody, renderReader, scrollToFocused } from './views/reader.js';
 import { openCompose } from './views/compose.js';
@@ -661,8 +661,121 @@ class App {
       return;
     }
     // The picker opens at once: what is typed next filters it.
-    const folder = await pickFolder(api.folders([...accounts][0]));
+    const account = [...accounts][0];
+    let folder = await pickFolder(api.folders(account));
+    if (folder?.create) folder = await this.createFolder(account, folder.create);
     if (folder) this.act('move', { folder, list });
+  }
+
+  // -------------------------------------------------------------------------
+  // Folders
+  // -------------------------------------------------------------------------
+
+  /** Makes a folder on the server; resolves to its name, or null. */
+  async createFolder(account, name, parent = '') {
+    try {
+      const { role } = await api.createFolder(account, name, parent);
+      if (!this.isExpanded(account)) this.toggleExpanded(account);
+      await this.loadAccounts();
+      toast(`Folder ${folderLabel(role)} created`);
+      return role.slice('folder:'.length);
+    } catch (err) {
+      toast(err.message, { type: 'error' });
+      return null;
+    }
+  }
+
+  async newFolder(account, parent = '') {
+    const name = await promptDialog(parent ? `New folder in ${folderLabel(parent)}` : 'New folder', { placeholder: 'Name', okText: 'Create' });
+    if (name) await this.createFolder(account, name, parent);
+  }
+
+  async renameFolder(account, role) {
+    const name = await promptDialog('Rename folder', { value: folderLabel(role), okText: 'Rename' });
+    if (!name || name === folderLabel(role)) return;
+    try {
+      const res = await api.renameFolder(account, role, name);
+      const { view } = this.state;
+      if (view.role === role) view.role = res.role;
+      await this.loadAccounts();
+      if (view.role === res.role) await this.loadThreads();
+    } catch (err) {
+      toast(err.message, { type: 'error' });
+    }
+  }
+
+  async deleteFolder(account, role) {
+    const gmail = this.accountOf(account)?.gmail;
+    const ok = await confirmDialog(`Delete ${folderLabel(role)}?`, gmail
+      ? 'The label is removed; its messages stay in All Mail.'
+      : 'The folder is removed from the server. Only an empty folder can be deleted.', { okText: 'Delete' });
+    if (!ok) return;
+    try {
+      await api.deleteFolder(account, role);
+      const viewing = this.state.view.role === role;
+      await this.loadAccounts();
+      if (viewing) await this.loadThreads();
+      toast(`Folder ${folderLabel(role)} deleted`);
+    } catch (err) {
+      toast(err.message, { type: 'error' });
+    }
+  }
+
+  // -------------------------------------------------------------------------
+  // Context menus (right click), in place of the browser's
+  // -------------------------------------------------------------------------
+
+  /** A conversation: its actions, on the whole selection when it is part of it. */
+  threadMenu(e, t, index) {
+    const { selected, threads } = this.state;
+    const list = selected.has(threadKey(t)) ? threads.filter((x) => selected.has(threadKey(x))) : [t];
+    const one = list.length === 1;
+    const role = this.roleOf(t);
+    const unread = list.some((x) => x.unread > 0);
+    const starred = list.some((x) => x.flagged);
+    openContextMenu(e, [
+      one ? { label: 'Open', icon: 'mailOpen', hint: 'Enter', run: () => { this.setCursor(index); this.openCursor(); } } : null,
+      one ? 'separator' : null,
+      role === 'inbox'
+        ? { label: 'Archive', icon: 'done', hint: 'A', run: () => this.act('done', { list }) }
+        : { label: 'Move to inbox', icon: 'inbox', hint: 'I', run: () => this.act('inbox', { list }) },
+      { label: 'Move to…', icon: 'folder', hint: 'm', run: () => this.openMoveMenu(list) },
+      role === 'trash' ? null : { label: 'Trash', icon: 'trash', hint: 'd', danger: true, run: () => this.act('trash', { list }) },
+      'separator',
+      { label: unread ? 'Mark as read' : 'Mark as unread', icon: unread ? 'mailOpen' : 'mail', hint: 'u', run: () => this.act(unread ? 'read' : 'unread', { list }) },
+      { label: starred ? 'Unstar' : 'Star', icon: 'star', hint: 's', run: () => this.act(starred ? 'unstar' : 'star', { list }) },
+      { label: selected.has(threadKey(t)) ? 'Deselect' : 'Select', icon: 'check', hint: 'x', run: () => {
+        const key = threadKey(t);
+        if (selected.has(key)) selected.delete(key);
+        else selected.add(key);
+        updateRows(this);
+        this.renderStatus();
+      } },
+    ], { title: one ? t.latest.subject || '(no subject)' : `${list.length} conversations` });
+  }
+
+  /** A folder of the sidebar. */
+  folderMenu(e, account, folder) {
+    const custom = isCustom(folder.role);
+    openContextMenu(e, [
+      { label: 'New folder', icon: 'plus', run: () => this.newFolder(account.id) },
+      custom ? { label: 'New folder inside', icon: 'folder', run: () => this.newFolder(account.id, folder.role) } : null,
+      custom ? 'separator' : null,
+      custom ? { label: 'Rename', icon: 'edit', run: () => this.renameFolder(account.id, folder.role) } : null,
+      custom ? { label: 'Delete', icon: 'trash', danger: true, run: () => this.deleteFolder(account.id, folder.role) } : null,
+      'separator',
+      { label: 'Synchronize', icon: 'refresh', run: () => api.sync(account.id) },
+    ], { title: folderLabel(folder.role) });
+  }
+
+  /** An account's header in the sidebar. */
+  accountMenu(e, account) {
+    const open = this.isExpanded(account.id);
+    openContextMenu(e, [
+      { label: 'New folder', icon: 'plus', run: () => this.newFolder(account.id) },
+      { label: open ? 'Show the inbox only' : 'Show every folder', icon: 'chevronRight', hint: '+', run: () => this.toggleExpanded(account.id) },
+      { label: 'Synchronize', icon: 'refresh', run: () => api.sync(account.id) },
+    ], { title: account.name });
   }
 
   /** The message replied to: the focused one, or the latest of the cursor. */
@@ -862,7 +975,7 @@ class App {
           row(['I'], 'Back to the inbox'),
           row(['u'], 'Read / unread'),
           row(['s'], 'Star'),
-          row(['m'], 'Move to a folder'),
+          row(['m'], 'Move to a folder (type a new name to create it)'),
           row(['Space'], 'Select and go to the next'),
           row(['z'], 'Undo'),
           h('h3', { class: 'field-label' }, 'Write and read'),
@@ -1097,27 +1210,32 @@ export function parseMailto(url) {
 }
 
 /**
- * A list of folders filtered by typing; resolves to the name, or null.
- * loading resolves to the folders.
+ * A list of folders filtered by typing; resolves to the name, to
+ * { create: name } for a folder to make, or null. loading resolves to the
+ * folders.
  */
 function pickFolder(loading) {
   return new Promise((resolve) => {
     let answer = null;
     let active = 0;
     let folders = [];
+    let loaded = false;
     let shown = folders;
     const input = h('input', { class: 'picker-input', placeholder: 'Move to…', autocomplete: 'off', spellcheck: false });
     const list = h('div', { class: 'picker-list' });
     const render = () => {
       list.replaceChildren(...(shown.length ? shown.map((f, i) => h('button', {
-        type: 'button', class: ['picker-item', i === active && 'active'],
+        type: 'button', class: ['picker-item', i === active && 'active', f.create && 'create'],
         onclick: () => { answer = f; m.close(); },
-      }, icon('folder'), h('span', { class: 'picker-label' }, f))) : [h('div', { class: 'picker-empty' }, 'No folder matches.')]));
+      }, icon(f.create ? 'plus' : 'folder'), h('span', { class: 'picker-label' }, f.create ? `New folder “${f.create}”` : f))) : [h('div', { class: 'picker-empty' }, 'No folder matches.')]));
       list.querySelector('.active')?.scrollIntoView({ block: 'nearest' });
     };
     const filter = () => {
-      const q = input.value.toLowerCase();
+      const typed = input.value.trim();
+      const q = typed.toLowerCase();
       shown = folders.filter((f) => f.toLowerCase().includes(q));
+      // A name no folder has: offer to make it, last.
+      if (typed && loaded && !folders.some((f) => f.toLowerCase() === q)) shown.push({ create: typed });
       active = 0;
       render();
     };
@@ -1142,6 +1260,7 @@ function pickFolder(loading) {
     input.focus();
     loading.then((list) => {
       folders = list;
+      loaded = true;
       filter();
     }, (err) => {
       m.close();
