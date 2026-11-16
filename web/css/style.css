@@ -637,6 +637,8 @@ select.input { cursor: pointer; }
 .message-snippet { overflow: hidden; color: var(--rp-muted); font-size: 0.82rem; text-overflow: ellipsis; white-space: nowrap; }
 .message-card:not(.collapsed) .message-snippet { display: none; }
 .message-card.collapsed .message-to { display: none; }
+.message-card:not(.collapsed) .message-to { white-space: normal; overflow-wrap: anywhere; }
+.message-card:not(.collapsed) :is(.message-from, .message-to) { cursor: text; }
 .message-meta { display: flex; align-items: center; gap: 6px; color: var(--rp-muted); font-size: 0.76rem; white-space: nowrap; }
 .message-meta .icon-star { color: var(--rp-gold); }
 .message-meta .icon-star svg { fill: currentColor; }
@@ -702,6 +704,9 @@ select.input { cursor: pointer; }
 .attachment .icon-button { width: 26px; height: 26px; }
 
 .reply-bar { display: flex; flex-wrap: wrap; gap: 8px; padding: 6px 20px 32px; }
+/* Above the conversation, by its newest message. */
+.thread-replies { padding: 18px 20px 0; }
+.thread-replies + .thread-messages { padding-bottom: 32px; }
 
 /* ==========================================================================
    Composer
@@ -834,6 +839,8 @@ select.compose-input { cursor: pointer; }
   .images-banner .icon { display: none; }
   .reply-bar { padding: 10px 16px calc(24px + env(safe-area-inset-bottom)); border-top: 1px solid var(--border); }
   .reply-bar .button { flex: 1; height: 40px; }
+  .thread-replies { padding: 4px 16px 14px; border-top: 0; }
+  .thread-replies + .thread-messages { padding-bottom: calc(24px + env(safe-area-inset-bottom)); }
   .reply-bar kbd, .body-switch kbd, .images-banner kbd { display: none; }
 
   .statusbar { display: none; }

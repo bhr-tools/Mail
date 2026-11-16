@@ -432,12 +432,12 @@ class App {
     const r = this.state.reader;
     if (!r || r.key !== key) return;
     r.subject = data.subject;
-    r.messages = data.messages;
-    const last = r.messages.length - 1;
-    // Every message unfolded; the reading starts at the first unread.
+    // Newest first, as the conversation list.
+    r.messages = data.messages.slice().reverse();
+    // Every message unfolded; the reading starts at the oldest unread, or
+    // at the newest message.
     for (const m of r.messages) r.expanded.add(m.id);
-    const firstUnread = r.messages.findIndex((m) => !m.seen);
-    r.focused = firstUnread >= 0 ? firstUnread : last;
+    r.focused = Math.max(0, r.messages.findLastIndex((m) => !m.seen));
     renderReader(this);
     if (r.messages.length > 1) scrollToFocused(this);
     // Opening a conversation reads it. Beside the list, where j / k show
@@ -460,8 +460,10 @@ class App {
       if (this.state.reader !== r) return;
       const known = new Set(r.messages.map((m) => m.id));
       for (const m of data.messages) if (!known.has(m.id)) r.expanded.add(m.id);
-      r.messages = data.messages;
-      r.focused = Math.min(r.focused, r.messages.length - 1);
+      // The focus stays on its message as new ones arrive on top.
+      const focusedId = r.messages[r.focused]?.id;
+      r.messages = data.messages.slice().reverse();
+      r.focused = Math.max(0, r.messages.findIndex((m) => m.id === focusedId));
       renderReader(this);
     } catch { /* the conversation left this folder: keep what is shown */ }
   }
@@ -478,6 +480,9 @@ class App {
   toggleMessage(id) {
     const r = this.state.reader;
     if (!r) return;
+    // A click that ends a text selection (an address to copy) keeps the
+    // message as it is.
+    if (String(window.getSelection?.() || '')) return;
     if (r.expanded.has(id) && r.messages.length > 1) r.expanded.delete(id);
     else r.expanded.add(id);
     r.focused = Math.max(0, r.messages.findIndex((m) => m.id === id));
@@ -559,10 +564,10 @@ class App {
           if (action === 'read' || action === 'unread') m.seen = action === 'read';
         }
         if (action === 'star' || action === 'unstar') {
-          const last = r.messages[r.messages.length - 1];
+          const latest = r.messages[0];
           // The messages may still be loading.
           if (action === 'unstar') for (const m of r.messages) m.flagged = false;
-          else if (last) last.flagged = true;
+          else if (latest) latest.flagged = true;
         }
         renderReader(this);
       }
@@ -783,7 +788,7 @@ class App {
     const r = this.state.reader;
     if (r?.messages.length) {
       // Replying to a message of one's own (sent) answers its conversation.
-      return r.messages[r.focused] || r.messages[r.messages.length - 1];
+      return r.messages[r.focused] || r.messages[0];
     }
     return this.cursorThread()?.latest || null;
   }

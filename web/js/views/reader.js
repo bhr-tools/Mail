@@ -1,4 +1,4 @@
-// The open conversation: its messages, newest last. Read messages are
+// The open conversation: its messages, newest first. Read messages are
 // folded to one line; the HTML of a message is shown in a frame without
 // scripts, its remote images blocked until asked for.
 
@@ -12,7 +12,15 @@ function card(app, r, m) {
   let c = r.cards.get(m.id);
   if (c) return c;
   c = { m, full: null, error: '', showImages: false, textMode: false, el: null, body: null, loading: false };
-  const head = h('div', { class: 'message-head', onclick: () => app.toggleMessage(m.id) });
+  // On an unfolded message the sender and recipients can be selected and
+  // copied: a click on them does not fold it.
+  const head = h('div', {
+    class: 'message-head',
+    onclick: (e) => {
+      if (!c.el.classList.contains('collapsed') && e.target.closest('.message-from, .message-to')) return;
+      app.toggleMessage(c.m.id);
+    },
+  });
   c.body = h('div', { class: 'message-body' });
   c.el = h('article', { class: 'message-card', dataset: { id: m.id } }, head, c.body);
   c.head = head;
@@ -20,16 +28,22 @@ function card(app, r, m) {
   return c;
 }
 
-function renderHead(app, c) {
+function renderHead(app, c, expanded) {
   const { m } = c;
+  // Rebuilt only when it changes, or a selection in it would be lost.
+  const key = JSON.stringify([expanded, m.from, m.to, m.cc, m.snippet, m.draft, m.attachments, m.flagged, m.date]);
+  if (c.headKey === key) return;
+  c.headKey = key;
+  // Folded, the names; unfolded, the addresses in full.
+  const people = (list) => (expanded ? formatAddresses(list) : list.map(personName).join(', '));
   c.head.replaceChildren(
     h('div', { class: 'message-who' },
       h('div', { class: 'message-from' },
         h('strong', null, personName(m.from) || '(unknown sender)'),
         m.from.name ? h('span', { class: 'message-address' }, m.from.address) : null),
       h('div', { class: 'message-to', title: formatAddresses([...m.to, ...m.cc]) },
-        m.to.length ? `To ${m.to.map(personName).join(', ')}` : '',
-        m.cc.length ? ` · Cc ${m.cc.map(personName).join(', ')}` : ''),
+        m.to.length ? `To ${people(m.to)}` : '',
+        m.cc.length ? ` · Cc ${people(m.cc)}` : ''),
       h('div', { class: 'message-snippet' }, m.snippet || '')),
     h('div', { class: 'message-meta' },
       m.draft ? h('span', { class: 'draft-label' }, 'Draft') : null,
@@ -165,7 +179,7 @@ export function renderReader(app) {
       h('p', null, h('kbd', null, 'j'), ' ', h('kbd', null, 'k'), ' to move.')));
     return;
   }
-  const latest = r.messages[r.messages.length - 1];
+  const latest = r.messages[0];
   const starred = r.messages.some((m) => m.flagged);
   const unread = r.messages.some((m) => !m.seen);
   const role = r.view;
@@ -198,8 +212,8 @@ export function renderReader(app) {
   r.messages.forEach((m, i) => {
     const c = card(app, r, m);
     c.m = m;
-    renderHead(app, c);
     const expanded = r.expanded.has(m.id);
+    renderHead(app, c, expanded);
     c.el.classList.toggle('collapsed', !expanded);
     c.el.classList.toggle('focused', i === r.focused);
     if (expanded) {
@@ -211,7 +225,7 @@ export function renderReader(app) {
   });
   while (list.children.length > r.messages.length) list.lastElementChild.remove();
 
-  const replyBar = latest && !latest.draft ? h('div', { class: 'reply-bar' },
+  const replyBar = latest && !latest.draft ? h('div', { class: ['reply-bar', 'thread-replies'] },
     h('button', { type: 'button', class: 'button', onclick: () => app.reply('reply') }, icon('reply'), 'Reply ', h('kbd', null, 'r')),
     h('button', { type: 'button', class: 'button', onclick: () => app.reply('all') }, icon('replyAll'), 'Reply all ', h('kbd', null, 'R')),
     h('button', { type: 'button', class: 'button', onclick: () => app.reply('forward') }, icon('forward'), 'Forward ', h('kbd', null, 'f'))) : null;
@@ -225,7 +239,7 @@ export function renderReader(app) {
     r.title.replaceWith(title);
     r.foot.replaceWith(foot);
   } else {
-    el.replaceChildren(header, title, list, foot);
+    el.replaceChildren(header, title, foot, list);
   }
   Object.assign(r, { header, title, foot });
 }

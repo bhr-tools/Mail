@@ -186,11 +186,23 @@ def desktop(browser):
     cards = page.locator(".message-card")
     expect(cards).to_have_count(3)
     expect(page.locator(".message-card.collapsed")).to_have_count(0)
+    # Newest first.
     expect(cards.nth(1)).to_contain_text("Ben")
-    expect(cards.nth(2)).not_to_have_class(re.compile("collapsed"))
-    expect(cards.nth(2).locator(".mail-text")).to_contain_text("I added two figures")
+    expect(cards.nth(0)).not_to_have_class(re.compile("collapsed"))
+    expect(cards.nth(0).locator(".mail-text")).to_contain_text("I added two figures")
     # Quotes are folded behind a toggle.
-    expect(cards.nth(2).locator(".quote")).to_be_hidden()
+    expect(cards.nth(0).locator(".quote")).to_be_hidden()
+    # Unfolded, the addresses are shown in full, and selecting them does not
+    # fold the message.
+    who = cards.nth(0).locator(".message-from strong")
+    expect(cards.nth(0).locator(".message-to")).to_contain_text("@")
+    who.dblclick(position={"x": 8, "y": 6})
+    assert page.evaluate("String(getSelection())").strip(), "nothing selected"
+    expect(cards.nth(0)).not_to_have_class(re.compile("collapsed"))
+    cards.nth(0).locator(".message-meta").click()
+    expect(cards.nth(0)).to_have_class(re.compile("collapsed"))
+    cards.nth(0).locator(".message-head").click()
+    expect(cards.nth(0)).not_to_have_class(re.compile("collapsed"))
     shot(page, "04-thread")
 
     # r: reply, typed at once (before the reply is prefilled), sent with Ctrl+Enter.
