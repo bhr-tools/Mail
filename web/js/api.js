@@ -68,6 +68,8 @@ export const api = {
 
   accounts: () => get('/api/accounts'),
   setAccountOrder: (accounts) => put('/api/accounts/order', { accounts }),
+  /** Resolves to the setting as saved { domain, accounts }. */
+  setAddy: (domain, accounts) => put('/api/settings/addy', { domain, accounts }),
   folders: (account) => get(`/api/accounts/${enc(account)}/folders`),
   /** parent: role of the folder it goes in ('' for the top). Resolves to { role }. */
   createFolder: (account, name, parent = '') => post(`/api/accounts/${enc(account)}/folders`, { name, parent }),

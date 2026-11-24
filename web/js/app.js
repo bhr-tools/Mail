@@ -8,6 +8,7 @@ import { folderLabel, isCustom, navigation, renderSidebar } from './views/sideba
 import { renderList, threadKey, updateRows } from './views/list.js';
 import { renderBody, renderReader, scrollToFocused } from './views/reader.js';
 import { openCompose } from './views/compose.js';
+import { openAddySettings } from './views/addy.js';
 import { describeQuery, openSearchPage } from './views/search.js';
 import { initKeys } from './keys.js';
 import { edgeSwipe, pullToRefresh } from './ui/swipe.js';
@@ -50,6 +51,7 @@ class App {
     this.state = {
       auth: { no_auth: false, has_password: true, authenticated: false },
       accounts: [],
+      addy: { domain: '', accounts: [] },
       version: 0,
       view: { role: 'inbox', account: prefs.get('account', '') },
       search: null, // { query }
@@ -110,6 +112,7 @@ class App {
   async loadAccounts() {
     const data = await api.accounts();
     this.state.accounts = data.accounts;
+    this.state.addy = data.addy;
     if (!this.state.version) this.state.version = data.version;
     const { view } = this.state;
     // With several accounts, the view is always one of them.
@@ -1204,6 +1207,7 @@ class App {
       { label: 'Check for new mail', icon: 'refresh', run: () => this.syncNow() },
       { label: 'Keyboard shortcuts', icon: 'search', hint: '?', run: () => this.openHelp() },
       { label: 'Open mailto: links here', icon: 'link', run: () => this.registerMailto() },
+      { label: 'addy.io aliases', icon: 'mail', run: () => openAddySettings(this) },
       ...(this.state.auth.no_auth ? [] : [
         'separator',
         { label: 'Change password', icon: 'key', run: () => this.changePassword() },

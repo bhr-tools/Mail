@@ -116,6 +116,9 @@ select.input { cursor: pointer; }
 
 .checkbox { display: inline-flex; align-items: center; gap: 8px; color: var(--rp-subtle); font-size: 0.84rem; cursor: pointer; user-select: none; }
 .checkbox input { width: 16px; height: 16px; accent-color: var(--accent); }
+.addy-account { padding: 3px 0; color: var(--rp-text); }
+.addy-address { overflow: hidden; color: var(--rp-muted); text-overflow: ellipsis; white-space: nowrap; }
+.addy-actions { display: flex; justify-content: flex-end; gap: 8px; }
 
 .segmented {
   display: inline-flex;
@@ -728,6 +731,7 @@ select.input { cursor: pointer; }
 select.compose-input { cursor: pointer; }
 .compose-input::placeholder { color: var(--rp-muted); }
 .compose-toggle { color: var(--rp-muted); font-size: 0.78rem; }
+.compose-suffix { flex-shrink: 1; min-width: 0; overflow: hidden; color: var(--rp-muted); font-size: 0.9rem; text-overflow: ellipsis; white-space: nowrap; }
 .compose-toggle:hover { color: var(--rp-text); }
 .compose-body {
   flex: 1;

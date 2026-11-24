@@ -5,6 +5,7 @@ import { api } from '../api.js';
 import { h, icon } from '../dom.js';
 import { fileSize, formatAddresses } from '../format.js';
 import { confirmDialog, openModal, toast } from '../ui/overlay.js';
+import { addyDomain } from './addy.js';
 
 // "attached", "pièce jointe", "ci-joint"… in the new text (quotes left out).
 const MENTIONS_ATTACHMENT = /(attach|enclosed|pi[eè]ce[s]? jointe|ci-joint|en pj\b|\bpj\b)/i;
@@ -104,6 +105,24 @@ export function openCompose(app, source = {}) {
   let ready = !pending;
   const from = h('select', { class: 'compose-input', attrs: { 'aria-label': 'From' } },
     accounts.map((a) => h('option', { value: a.id, selected: a.id === draft.account }, `${a.name} · ${a.address}`)));
+  // Sending from an addy.io alias: the root here, the domain set once in
+  // the settings. Empty sends from the account's own address.
+  const alias = h('input', {
+    class: 'compose-input', value: draft.alias || '', placeholder: 'None: send from your own address',
+    autocomplete: 'off', spellcheck: false, attrs: { 'aria-label': 'Alias' },
+  });
+  const aliasDomain = h('span', { class: 'compose-suffix' });
+  const aliasRow = h('label', { class: 'compose-field', title: 'Sent through addy.io: recipients see the alias, not your address' },
+    h('span', { class: 'compose-label' }, 'Alias'), alias, aliasDomain);
+  const showAlias = () => {
+    const domain = addyDomain(app, from.value);
+    aliasRow.hidden = !domain;
+    aliasDomain.textContent = `@${domain}`;
+    aliasDomain.hidden = !alias.value.trim();
+  };
+  showAlias();
+  from.addEventListener('change', showAlias);
+  alias.addEventListener('input', showAlias);
   const to = addressField('To', formatAddresses(draft.to));
   const showCopies = (draft.cc?.length || 0) + (draft.bcc?.length || 0) > 0;
   const cc = addressField('Cc', formatAddresses(draft.cc), { hidden: !showCopies });
@@ -138,7 +157,7 @@ export function openCompose(app, source = {}) {
     renderFiles();
   });
 
-  const snapshot = () => JSON.stringify([to.input.value, cc.input.value, bcc.input.value, subject.value, body.value]);
+  const snapshot = () => JSON.stringify([alias.value, to.input.value, cc.input.value, bcc.input.value, subject.value, body.value]);
   let initial = snapshot();
   const dirty = () => files.length > 0 || snapshot() !== initial;
   const message = () => ({
@@ -152,6 +171,7 @@ export function openCompose(app, source = {}) {
     forward_of: draft.forward_of || 0,
     forward_parts: forwarded.map((p) => p.index),
     draft_id: draft.draft_id || 0,
+    alias: aliasRow.hidden ? '' : alias.value.trim(),
   });
 
   let busy = false;
@@ -215,6 +235,7 @@ export function openCompose(app, source = {}) {
     title: pending ? 'Loading…' : titleOf(draft),
     body: [
       accounts.length > 1 ? h('label', { class: 'compose-field' }, h('span', { class: 'compose-label' }, 'From'), from) : null,
+      aliasRow,
       to.row, cc.row, bcc.row,
       h('label', { class: 'compose-field' }, h('span', { class: 'compose-label' }, 'Subject'), subject),
       body,
@@ -280,6 +301,8 @@ export function openCompose(app, source = {}) {
     ready = true;
     const typed = body.value;
     from.value = d.account;
+    alias.value = d.alias || '';
+    showAlias();
     to.input.value = formatAddresses(d.to);
     cc.input.value = formatAddresses(d.cc);
     bcc.input.value = formatAddresses(d.bcc);

@@ -168,6 +168,8 @@ type Draft struct {
 	Forwarded []Part       `json:"forwarded,omitempty"`
 	// DraftID is the draft being finished, replaced when saved or sent.
 	DraftID int64 `json:"draft_id,omitempty"`
+	// Alias is the root of the addy.io alias the message is sent from.
+	Alias string `json:"alias,omitempty"`
 }
 
 var replyPrefix = regexp.MustCompile(`(?i)^\s*((re|aw|fw|fwd|tr)\s*(\[\d+\])?\s*:\s*)+`)

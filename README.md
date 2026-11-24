@@ -8,6 +8,7 @@ A minimalist, self-hosted mail client in the spirit of Get Done, Focus and Calen
 - **Done means archived:** `A` takes a conversation out of the inbox, `z` brings it back. Actions show at once and reach the server in the background.
 - **Conversations:** the reader always shows the conversation under the cursor, every message unfolded; replies are grouped with the messages they answer, your own answers (from Sent) included. Quotes are folded. A conversation counts as read once it has been shown a second.
 - **Plain text writing:** reply, reply all, forward (with the attachments), drafts kept on the server, addresses completed from the people you write to. A missing attachment is caught before sending.
+- **addy.io aliases:** in the settings menu, give your alias domain once and tick the accounts verified on addy.io. Their composer gets an **Alias** field: write to people by their usual address, type the alias (`shop`), and the message leaves as `shop@your.domain` (sent to addy.io's reverse addresses, `shop+bob=example.com@your.domain`). Replies to mail forwarded by addy.io pick the same alias and show the real sender.
 - **Full Vim navigation:** fully operable from the keyboard, AZERTY included.
 - **At home on a phone:** installable on the home screen. Swipe a conversation left to throw it away, right to move it; pull the list down to check for new mail; swipe from the left edge of a conversation to go back.
 - **Quiet:** no notification, no badge, no tracking. New mail shows when you look.

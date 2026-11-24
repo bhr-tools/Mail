@@ -11,6 +11,7 @@ import (
 
 	"github.com/emersion/go-imap/v2"
 
+	"github.com/bhr-tools/mail/internal/addy"
 	"github.com/bhr-tools/mail/internal/config"
 	"github.com/bhr-tools/mail/internal/db"
 	"github.com/bhr-tools/mail/internal/message"
@@ -71,6 +72,7 @@ func (a *API) compose(w http.ResponseWriter, r *http.Request) {
 		fail(w, r, invalid("Unknown mode"))
 		return
 	}
+	a.readAliases(&d, m)
 	if d.To == nil {
 		d.To = []db.Address{}
 	}
@@ -81,6 +83,77 @@ func (a *API) compose(w http.ResponseWriter, r *http.Request) {
 		d.Bcc = []db.Address{}
 	}
 	writeJSON(w, http.StatusOK, d)
+}
+
+// readAliases shows the real people behind addy.io reverse aliases, and
+// picks the alias to send from: the one of these reverse aliases, or else the
+// alias the original message was sent to.
+func (a *API) readAliases(d *message.Draft, orig *db.Message) {
+	settings, err := a.store.AddySettings()
+	if err != nil || !settings.Enabled(d.Account) {
+		return
+	}
+	domain := settings.Domain
+	var fromReverse, fromAlias string
+	read := func(list []db.Address) []db.Address {
+		out := []db.Address{}
+		for _, addr := range list {
+			if alias, recipient, ok := addy.Decode(addr.Address, domain); ok {
+				if fromReverse == "" {
+					fromReverse = alias
+				}
+				name := addr.Name
+				// addy.io names the sender after its address.
+				if strings.Contains(name, "@") {
+					name = ""
+				}
+				out = append(out, db.Address{Name: name, Address: recipient})
+			} else if addy.InDomain(addr.Address, domain) {
+				// One's own alias: not a person to write to.
+				if fromAlias == "" {
+					fromAlias = addy.Local(addr.Address)
+				}
+			} else {
+				out = append(out, addr)
+			}
+		}
+		return out
+	}
+	d.To, d.Cc, d.Bcc = read(d.To), read(d.Cc), read(d.Bcc)
+	if d.InReplyTo != 0 && orig != nil && fromAlias == "" {
+		read(append(append([]db.Address{}, orig.To...), orig.Cc...))
+	}
+	switch {
+	case fromReverse != "":
+		d.Alias = fromReverse
+	case d.InReplyTo != 0 || d.DraftID != 0:
+		d.Alias = fromAlias
+	}
+}
+
+// sendingAlias rewrites the recipients of o to the addy.io reverse aliases
+// that send from alias. Without an alias, o is left as it is.
+func (a *API) sendingAlias(account, alias string, o *message.Outgoing) error {
+	alias = strings.TrimSpace(alias)
+	if alias == "" {
+		return nil
+	}
+	settings, err := a.store.AddySettings()
+	if err != nil {
+		return err
+	}
+	if !settings.Enabled(account) {
+		return invalid("This account does not send through addy.io")
+	}
+	if !addy.ValidAlias(alias) {
+		return invalid("Alias: letters, digits, dots, hyphens and underscores only")
+	}
+	for _, list := range []*[]db.Address{&o.To, &o.Cc, &o.Bcc} {
+		for i, addr := range *list {
+			(*list)[i].Address = addy.Encode(alias, settings.Domain, addr.Address)
+		}
+	}
+	return nil
 }
 
 func (a *API) findByMessageID(account, messageID string) *db.Message {
@@ -105,6 +178,11 @@ type outgoingRequest struct {
 	ForwardParts []int `json:"forward_parts"`
 	// DraftID is the draft this message replaces.
 	DraftID int64 `json:"draft_id"`
+	// Alias is the root of the addy.io alias to send from ("": none).
+	Alias string `json:"alias"`
+
+	// people are the recipients as typed, before addy.io rewrites them.
+	people []db.Address
 }
 
 // readOutgoing reads a multipart form: the message as JSON, and files.
@@ -136,6 +214,12 @@ func (a *API) readOutgoing(w http.ResponseWriter, r *http.Request) (*outgoingReq
 		if *field.dst, err = message.ParseAddressList(field.value); err != nil {
 			return nil, nil, invalid(field.label + ": " + err.Error())
 		}
+	}
+	for _, list := range [][]db.Address{o.To, o.Cc, o.Bcc} {
+		req.people = append(req.people, list...)
+	}
+	if err := a.sendingAlias(req.Account, req.Alias, o); err != nil {
+		return nil, nil, err
 	}
 	if req.InReplyTo != 0 {
 		if parent, err := a.store.Message(req.InReplyTo); err == nil {
@@ -220,8 +304,7 @@ func (a *API) send(w http.ResponseWriter, r *http.Request) {
 	if req.DraftID != 0 {
 		a.deleteDraft(req.Account, req.DraftID)
 	}
-	all := append(append(append([]db.Address{}, o.To...), o.Cc...), o.Bcc...)
-	if err := a.store.NoteSent(all); err != nil {
+	if err := a.store.NoteSent(req.people); err != nil {
 		log.Printf("contacts: %v", err)
 	}
 	acc.Wake(config.Inbox, config.Drafts)
@@ -270,10 +353,32 @@ func (a *API) saveDraft(w http.ResponseWriter, r *http.Request) {
 
 // contacts completes addresses.
 func (a *API) contacts(w http.ResponseWriter, r *http.Request) {
-	list, err := a.store.Contacts(r.URL.Query().Get("q"), 8)
+	const limit = 8
+	list, err := a.store.Contacts(r.URL.Query().Get("q"), 2*limit)
 	if err != nil {
 		fail(w, r, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, list)
+	// Senders reached through addy.io are suggested by their real address;
+	// one's own aliases are left out.
+	settings, _ := a.store.AddySettings()
+	out := []db.Contact{}
+	seen := map[string]bool{}
+	for _, c := range list {
+		if _, recipient, ok := addy.Decode(c.Address, settings.Domain); ok {
+			c.Address = recipient
+			if strings.Contains(c.Name, "@") {
+				c.Name = ""
+			}
+		} else if addy.InDomain(c.Address, settings.Domain) {
+			continue
+		}
+		key := strings.ToLower(c.Address)
+		if seen[key] || len(out) == limit {
+			continue
+		}
+		seen[key] = true
+		out = append(out, c)
+	}
+	writeJSON(w, http.StatusOK, out)
 }

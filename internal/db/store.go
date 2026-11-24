@@ -224,6 +224,12 @@ var migrations = []string{
 		account TEXT PRIMARY KEY,
 		position INTEGER NOT NULL
 	);`,
+
+	// Settings changed in the app (JSON values).
+	`CREATE TABLE settings (
+		key TEXT PRIMARY KEY,
+		value TEXT NOT NULL
+	);`,
 }
 
 func (s *Store) migrate() error {

@@ -85,7 +85,36 @@ func (a *API) accounts(w http.ResponseWriter, r *http.Request) {
 		return len(order)
 	}
 	sort.SliceStable(list, func(i, j int) bool { return position(list[i].ID) < position(list[j].ID) })
-	writeJSON(w, http.StatusOK, map[string]any{"accounts": list, "version": a.store.Version(), "no_auth": a.noAuth})
+	addySettings, err := a.store.AddySettings()
+	if err != nil {
+		fail(w, r, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"accounts": list, "version": a.store.Version(), "no_auth": a.noAuth, "addy": addySettings})
+}
+
+// setAddy records the addy.io setting.
+func (a *API) setAddy(w http.ResponseWriter, r *http.Request) {
+	var body db.Addy
+	if !decode(w, r, &body) {
+		return
+	}
+	for _, id := range body.Accounts {
+		if a.mail.Account(id) == nil {
+			writeError(w, http.StatusBadRequest, "unknown account "+id)
+			return
+		}
+	}
+	if err := a.store.SetAddySettings(body); err != nil {
+		fail(w, r, err)
+		return
+	}
+	saved, err := a.store.AddySettings()
+	if err != nil {
+		fail(w, r, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, saved)
 }
 
 // setAccountOrder records the order of the accounts in the sidebar.
