@@ -41,6 +41,8 @@ const ACTION_LABELS = {
   done: 'Archived', trash: 'Moved to the trash', inbox: 'Moved to the inbox', read: 'Marked as read',
   unread: 'Marked as unread', star: 'Starred', unstar: 'Star removed', delete: 'Deleted',
 };
+// Actions kept for z; the server keeps them a day.
+const UNDO_LIMIT = 50;
 const MOVES = new Set(['done', 'trash', 'inbox', 'move', 'delete']);
 
 class App {
@@ -58,7 +60,7 @@ class App {
       selected: new Set(), // thread keys
       open: null, // key of the open conversation
       reader: null,
-      undo: null, // { ids, label }
+      undo: [], // { ids, label }, latest last
     };
     // Accounts showing every folder; the others show their inbox only.
     this.expanded = new Set(readJSON(prefs.get('expanded', '[]')));
@@ -582,21 +584,42 @@ class App {
       if (!byRole.has(role)) byRole.set(role, []);
       byRole.get(role).push({ account: t.account, thread: t.thread });
     }
+    const n = (removed || list).length;
+    const label = action === 'move' ? `Moved to ${folder}` : ACTION_LABELS[action];
+    // On the stack at once, so that a z pressed before the server answers
+    // undoes this action and not the one before. A deletion for good
+    // cannot be undone.
+    const entry = action === 'delete' ? null : { label, ids: null };
+    if (entry) {
+      this.state.undo.push(entry);
+      if (this.state.undo.length > UNDO_LIMIT) this.state.undo.shift();
+    }
     const ids = [];
-    try {
-      for (const [role, threads] of byRole) {
-        const res = await api.act(action, role, { threads, folder });
-        ids.push(...res.undo);
+    let failure = null;
+    const request = (async () => {
+      try {
+        for (const [role, threads] of byRole) {
+          const res = await api.act(action, role, { threads, folder });
+          ids.push(...res.undo);
+        }
+      } catch (err) {
+        failure = err;
       }
-    } catch (err) {
-      toast(err.message, { type: 'error' });
+      return ids; // what was done, even when a later request failed
+    })();
+    if (entry) entry.ids = request;
+    await request;
+    if (entry && !ids.length) {
+      // Nothing was done: nothing to undo.
+      const i = this.state.undo.indexOf(entry);
+      if (i >= 0) this.state.undo.splice(i, 1);
+    }
+    if (failure) {
+      toast(failure.message, { type: 'error' });
       this.refresh();
       return;
     }
-    const n = (removed || list).length;
-    const label = action === 'move' ? `Moved to ${folder}` : ACTION_LABELS[action];
-    this.state.undo = ids.length ? { ids, label } : null;
-    toast(n > 1 ? `${label} · ${n} conversations` : label, ids.length && action !== 'delete'
+    toast(n > 1 ? `${label} · ${n} conversations` : label, entry && ids.length
       ? { action: { label: 'Undo (z)', run: () => this.undoLast() } } : {});
     this.renderStatus();
   }
@@ -642,16 +665,21 @@ class App {
   }
 
   async undoLast() {
-    const undo = this.state.undo;
+    const undo = this.state.undo.pop();
     if (!undo) {
       toast('Nothing to undo');
       return;
     }
-    this.state.undo = null;
     try {
-      await api.undo(undo.ids);
-      toast(`Undone: ${undo.label.toLowerCase()}`);
+      const ids = await undo.ids;
+      if (!ids.length) return; // the action itself failed
+      await api.undo(ids);
+      const left = this.state.undo.length;
+      toast(`Undone: ${undo.label.toLowerCase()}`, left
+        ? { action: { label: `Undo (z) · ${left} more`, run: () => this.undoLast() } } : {});
     } catch (err) {
+      // Kept to try again when the server could not be reached.
+      if (err.status === 0) this.state.undo.push(undo);
       toast(err.message, { type: 'error' });
     }
     await this.refresh();

@@ -172,6 +172,22 @@ def desktop(browser):
     page.keyboard.press("z")
     expect(rows(page)).to_have_count(4)
 
+    # z goes back several actions, latest first.
+    page.keyboard.press("g")
+    page.keyboard.press("g")
+    page.keyboard.press("d")
+    expect(rows(page)).to_have_count(3)
+    page.keyboard.press("d")
+    expect(rows(page)).to_have_count(2)
+    # Pressed at once: the second trash is undone, not the action before.
+    page.keyboard.press("z")
+    expect(rows(page)).to_have_count(3)
+    page.keyboard.press("z")
+    expect(rows(page)).to_have_count(4)
+    # The star and its removal, further back, are still there.
+    expect(page.locator(".toast")).to_contain_text("Undone: moved to the trash")
+    expect(page.locator(".toast")).to_contain_text("2 more")
+
     # Attachments open from the reader.
     row(page, "Invoice for the gala hall").click()
     attachment = page.locator(".attachment-name", has_text="invoice-gala.pdf")

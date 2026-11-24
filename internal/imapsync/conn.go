@@ -23,6 +23,15 @@ import (
 
 const dialTimeout = 20 * time.Second
 
+// staleAfter is how long a connection rests before it is checked with a
+// NOOP: servers (and routers) drop connections left unused, and a command
+// sent on one fails with "use of closed network connection".
+const staleAfter = time.Minute
+
+// noopTimeout bounds that check: a connection dropped silently by a router
+// would otherwise hold it for minutes.
+const noopTimeout = 10 * time.Second
+
 var wordDecoder = &mime.WordDecoder{CharsetReader: gomessage.CharsetReader}
 
 // refusedRetry is how long a refused password rests before it is tried
@@ -102,6 +111,7 @@ type conn struct {
 	refused *refusals
 	mu      sync.Mutex
 	client  *imapclient.Client
+	used    time.Time
 }
 
 // with runs fn on the connection, opening it if needed. A failed command
@@ -109,6 +119,10 @@ type conn struct {
 func (c *conn) with(fn func(*imapclient.Client) error) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
+	if c.client != nil && !c.alive() {
+		c.client.Close()
+		c.client = nil
+	}
 	if c.client == nil {
 		client, err := dial(c.account, c.refused, nil)
 		if err != nil {
@@ -117,6 +131,7 @@ func (c *conn) with(fn func(*imapclient.Client) error) error {
 		c.client = client
 	}
 	err := fn(c.client)
+	c.used = time.Now()
 	var imapErr *imap.Error
 	var refusal *db.ValidationError
 	if err != nil && !errors.As(err, &imapErr) && !errors.As(err, &refusal) {
@@ -125,6 +140,27 @@ func (c *conn) with(fn func(*imapclient.Client) error) error {
 		c.client = nil
 	}
 	return err
+}
+
+// alive reports whether the connection still answers. One used recently is
+// trusted; one that rested is asked a NOOP.
+func (c *conn) alive() bool {
+	select {
+	case <-c.client.Closed():
+		return false
+	default:
+	}
+	if time.Since(c.used) < staleAfter {
+		return true
+	}
+	done := make(chan error, 1)
+	go func() { done <- c.client.Noop().Wait() }()
+	select {
+	case err := <-done:
+		return err == nil
+	case <-time.After(noopTimeout):
+		return false // closing the client ends the NOOP
+	}
 }
 
 func (c *conn) close() {
