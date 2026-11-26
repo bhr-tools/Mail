@@ -22,12 +22,13 @@ function depth(role) {
   return isCustom(role) ? role.slice(CUSTOM.length).split('/').length - 1 : 0;
 }
 
-function folderRow(app, { label, iconName, count, unread, active, run, menu, hint, indent = 0, className }) {
+function folderRow(app, { label, iconName, count, unread, active, run, menu, hint, indent = 0, className, dataset }) {
   return h('button', {
     type: 'button',
     class: ['folder-row', active && 'active', unread && 'has-unread', className],
     title: hint || label,
     style: indent ? { '--indent': indent } : undefined,
+    dataset,
     onclick: () => { run(); app.closeSidebar(); },
     oncontextmenu: menu,
   }, icon(iconName), h('span', { class: 'folder-name' }, label), count ? h('span', { class: 'folder-count' }, count) : null);
@@ -83,6 +84,8 @@ export function renderSidebar(app) {
       active,
       indent: depth(f.role),
       hint: `${f.name}${several ? ` · ${owner.name}` : ''}`,
+      // A conversation dragged from the list lands here (app.js).
+      dataset: { owner: owner.id, role: f.role, name: f.name },
       run: () => app.setView(f.role, item.account),
       menu: (e) => app.folderMenu(e, item.owner, f),
     }));

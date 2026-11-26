@@ -13,6 +13,9 @@ import { describeQuery, openSearchPage } from './views/search.js';
 import { initKeys } from './keys.js';
 import { edgeSwipe, pullToRefresh } from '/kit/js/swipe.js';
 import { createLock } from '/kit/js/lock.js';
+import { createUndo } from '/kit/js/undo.js';
+import { openHelp } from '/kit/js/help.js';
+import { draggable } from '/kit/js/drag.js';
 
 const COLORS = ['pine', 'rose', 'iris', 'gold', 'foam', 'love'];
 const PAGE = 50;
@@ -43,8 +46,6 @@ const ACTION_LABELS = {
   done: 'Archived', trash: 'Moved to the trash', inbox: 'Moved to the inbox', read: 'Marked as read',
   unread: 'Marked as unread', star: 'Starred', unstar: 'Star removed', delete: 'Deleted',
 };
-// Actions kept for z; the server keeps them a day.
-const UNDO_LIMIT = 50;
 const MOVES = new Set(['done', 'trash', 'inbox', 'move', 'delete']);
 
 class App {
@@ -62,7 +63,6 @@ class App {
       selected: new Set(), // thread keys
       open: null, // key of the open conversation
       reader: null,
-      undo: [], // { ids, label }, latest last
     };
     // Accounts showing every folder; the others show their inbox only.
     this.expanded = new Set(readJSON(prefs.get('expanded', '[]')));
@@ -71,6 +71,8 @@ class App {
     this.listSeq = 0;
     this.watching = false;
     this.handleKey = () => {};
+    // u undoes; the server keeps what is needed a day.
+    this.undos = createUndo({ toast });
     this.lockScreen = createLock({ appName: 'Mail', onUnlocked: () => this.afterLogin() });
   }
 
@@ -590,14 +592,9 @@ class App {
     }
     const n = (removed || list).length;
     const label = action === 'move' ? `Moved to ${folder}` : ACTION_LABELS[action];
-    // On the stack at once, so that a z pressed before the server answers
+    // On the stack at once, so that a u pressed before the server answers
     // undoes this action and not the one before. A deletion for good
     // cannot be undone.
-    const entry = action === 'delete' ? null : { label, ids: null };
-    if (entry) {
-      this.state.undo.push(entry);
-      if (this.state.undo.length > UNDO_LIMIT) this.state.undo.shift();
-    }
     const ids = [];
     let failure = null;
     const request = (async () => {
@@ -611,20 +608,29 @@ class App {
       }
       return ids; // what was done, even when a later request failed
     })();
-    if (entry) entry.ids = request;
+    const entry = action === 'delete' ? null : this.undos.push({
+      label,
+      undo: async () => {
+        const done = await request;
+        if (!done.length) return false; // the action itself failed
+        try {
+          await api.undo(done);
+        } finally {
+          this.refresh();
+        }
+        return true;
+      },
+    }, { quiet: true });
     await request;
-    if (entry && !ids.length) {
-      // Nothing was done: nothing to undo.
-      const i = this.state.undo.indexOf(entry);
-      if (i >= 0) this.state.undo.splice(i, 1);
-    }
+    // Nothing was done: nothing to undo.
+    if (entry && !ids.length) entry.cancel();
     if (failure) {
       toast(failure.message, { type: 'error' });
       this.refresh();
       return;
     }
     toast(n > 1 ? `${label} · ${n} conversations` : label, entry && ids.length
-      ? { action: { label: 'Undo (z)', run: () => this.undoLast() } } : {});
+      ? { action: { label: 'Undo', run: () => this.undos.run() } } : {});
     this.renderStatus();
   }
 
@@ -668,27 +674,6 @@ class App {
     this.act(list.some((t) => t.flagged) ? 'unstar' : 'star', { list });
   }
 
-  async undoLast() {
-    const undo = this.state.undo.pop();
-    if (!undo) {
-      toast('Nothing to undo');
-      return;
-    }
-    try {
-      const ids = await undo.ids;
-      if (!ids.length) return; // the action itself failed
-      await api.undo(ids);
-      const left = this.state.undo.length;
-      toast(`Undone: ${undo.label.toLowerCase()}`, left
-        ? { action: { label: `Undo (z) · ${left} more`, run: () => this.undoLast() } } : {});
-    } catch (err) {
-      // Kept to try again when the server could not be reached.
-      if (err.status === 0) this.state.undo.push(undo);
-      toast(err.message, { type: 'error' });
-    }
-    await this.refresh();
-  }
-
   /** m: moves the conversations to a folder picked from the list. */
   async openMoveMenu(list = this.targets()) {
     if (!list.length) return;
@@ -702,6 +687,43 @@ class App {
     let folder = await pickFolder(api.folders(account));
     if (folder?.create) folder = await this.createFolder(account, folder.create);
     if (folder) this.act('move', { folder, list });
+  }
+
+  /**
+   * Conversations dragged from the list onto a folder of the sidebar: the
+   * one grabbed, or the selection it belongs to. Not on a phone, where the
+   * sidebar is a drawer and a finger swipes the row.
+   */
+  bindDrag() {
+    let list = [];
+    const grabbed = (row) => {
+      const key = row.dataset.key;
+      const { selected, threads } = this.state;
+      if (selected.has(key)) return threads.filter((t) => selected.has(threadKey(t)));
+      return threads.filter((t) => threadKey(t) === key);
+    };
+    draggable($('thread-list'), {
+      rows: '.thread-row',
+      accept: () => this.wide(),
+      label: (row) => {
+        list = grabbed(row);
+        return list.length === 1 ? '1 conversation' : `${list.length} conversations`;
+      },
+      targets: () => {
+        const accounts = new Set(list.map((t) => t.account));
+        if (accounts.size !== 1) return [];
+        const here = new Set(list.map((t) => this.roleOf(t)));
+        return [...document.querySelectorAll('#folders .folder-row[data-role]')]
+          .filter((el) => accounts.has(el.dataset.owner) && !here.has(el.dataset.role)
+            && el.dataset.role !== 'drafts' && el.dataset.role !== 'sent')
+          .map((el) => ({ el, key: el.dataset.role }));
+      },
+      onDropOn: ({ target }) => {
+        const action = { inbox: 'inbox', archive: 'done', trash: 'trash' }[target.key];
+        if (action) this.act(action, { list });
+        else this.act('move', { folder: target.el.dataset.name, list });
+      },
+    });
   }
 
   // -------------------------------------------------------------------------
@@ -779,7 +801,7 @@ class App {
       { label: 'Move to…', icon: 'folder', hint: 'm', run: () => this.openMoveMenu(list) },
       role === 'trash' ? null : { label: 'Trash', icon: 'trash', hint: 'd', danger: true, run: () => this.act('trash', { list }) },
       'separator',
-      { label: unread ? 'Mark as read' : 'Mark as unread', icon: unread ? 'mailOpen' : 'mail', hint: 'u', run: () => this.act(unread ? 'read' : 'unread', { list }) },
+      { label: unread ? 'Mark as read' : 'Mark as unread', icon: unread ? 'mailOpen' : 'mail', hint: 'U', run: () => this.act(unread ? 'read' : 'unread', { list }) },
       { label: starred ? 'Unstar' : 'Star', icon: 'star', hint: 's', run: () => this.act(starred ? 'unstar' : 'star', { list }) },
       { label: selected.has(threadKey(t)) ? 'Deselect' : 'Select', icon: 'check', hint: 'x', run: () => {
         const key = threadKey(t);
@@ -985,46 +1007,7 @@ class App {
 
   openHelp() {
     if (topModal()?.el.classList.contains('help')) return topModal().close();
-    const row = (keys, label) => h('div', { class: 'help-row' }, h('span', null, label), h('span', { class: 'help-keys' }, keys.map((k) => h('kbd', null, k))));
-    openModal({
-      title: 'Keyboard shortcuts',
-      className: 'help',
-      body: h('div', { class: 'help-grid' },
-        h('section', null,
-          h('h3', { class: 'help-title' }, 'Move'),
-          row(['j', 'k'], 'Next / previous conversation (shown beside)'),
-          row(['g', 'g'], 'First conversation'),
-          row(['G'], 'Last conversation'),
-          row(['Ctrl', 'd'], 'Scroll the conversation down (Ctrl u: up)'),
-          h('h3', { class: 'help-title' }, 'Search'),
-          row(['/'], 'Search, with filters (account, folder…)'),
-          row(['↓', '↑'], 'Through the results (j k outside the fields)'),
-          row(['Enter'], 'Open the conversation'),
-          row(['Ctrl', 'Enter'], 'Show the results in the list'),
-          h('h3', { class: 'help-title' }, 'Folders'),
-          row(['J', 'K'], 'Next / previous folder'),
-          row(['+'], 'Fold / unfold the account'),
-          row(['&', 'é', '"', "'"], 'Each account')),
-        h('section', null,
-          h('h3', { class: 'help-title' }, 'Act'),
-          row(['A'], 'Done (archive)'),
-          row(['d'], 'Trash'),
-          row(['I'], 'Back to the inbox'),
-          row(['u'], 'Read / unread'),
-          row(['s'], 'Star'),
-          row(['m'], 'Move to a folder (type a new name to create it)'),
-          row(['Space'], 'Select and go to the next'),
-          row(['z'], 'Undo'),
-          h('h3', { class: 'help-title' }, 'Write and read'),
-          row(['c'], 'New message'),
-          row(['r', 'R', 'f'], 'Reply, reply all, forward'),
-          row(['e'], 'Finish a draft'),
-          row(['i'], 'Show remote images'),
-          row(['t'], 'Plain text / formatted'),
-          row(['o'], 'Open an attachment'),
-          row(['Ctrl', 'Enter'], 'Send'),
-          row(['Esc'], 'Close (keeps a draft)'))),
-    });
+    openHelp('Keyboard shortcuts', this.keyTable());
   }
 
   async syncNow() {
@@ -1097,6 +1080,7 @@ class App {
     $('search-button').addEventListener('click', () => this.openSearch());
     $('refresh-button').addEventListener('click', () => this.syncNow());
     pullToRefresh($('thread-list'), $('pull-hint'), () => this.syncNow());
+    this.bindDrag();
     edgeSwipe($('reader'), () => {
       if (!this.wide()) this.closeReader();
     });

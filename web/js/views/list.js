@@ -3,6 +3,7 @@
 import { h, icon } from '../dom.js';
 import { personName, shortDate } from '../format.js';
 import { deferWhileSwiping, swipeable } from '/kit/js/swipe.js';
+import { deferWhileDragging } from '/kit/js/drag.js';
 
 export const threadKey = (t) => `${t.account}\u0000${t.thread}`;
 
@@ -42,7 +43,7 @@ function row(app, t, index) {
   const el = h('div', {
     class: ['thread-row', t.unread > 0 && 'unread', index === cursor && 'cursor', selected.has(key) && 'selected', open === key && 'open'],
     attrs: { role: 'option', 'aria-selected': String(index === cursor) },
-    dataset: { index },
+    dataset: { index, key },
     onclick: (e) => {
       if (e.ctrlKey || e.metaKey) {
         app.setCursor(index);
@@ -63,7 +64,7 @@ function row(app, t, index) {
 }
 
 export function renderList(app) {
-  if (deferWhileSwiping(() => renderList(app))) return;
+  if (deferWhileSwiping(() => renderList(app)) || deferWhileDragging(() => renderList(app))) return;
   const el = document.getElementById('thread-list');
   const { threads, loading, more, search } = app.state;
   if (!threads.length) {

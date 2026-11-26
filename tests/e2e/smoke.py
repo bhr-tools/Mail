@@ -143,7 +143,7 @@ def desktop(browser):
     page.keyboard.press("t")
     expect(card.locator("iframe.mail-frame")).to_be_visible()
 
-    # Shift+A: done. The reader moves on to the next conversation; z undoes.
+    # Shift+A: done. The reader moves on to the next conversation; u undoes.
     page.keyboard.press("A")
     expect(page.locator(".toast")).to_contain_text("Archived")
     expect(rows(page)).to_have_count(3)
@@ -155,7 +155,7 @@ def desktop(browser):
     expect(page.locator(".reader-subject")).to_have_text(re.compile("."))
     page.keyboard.press("K")
     expect(page.locator("#list-title")).to_contain_text("Inbox")
-    page.keyboard.press("z")
+    page.keyboard.press("u")
     expect(page.locator(".toast")).to_contain_text("Undone")
     expect(rows(page)).to_have_count(4)
 
@@ -169,10 +169,10 @@ def desktop(browser):
     page.keyboard.press("d")
     expect(page.locator(".toast")).to_contain_text("Moved to the trash · 2 conversations")
     expect(rows(page)).to_have_count(2)
-    page.keyboard.press("z")
+    page.keyboard.press("u")
     expect(rows(page)).to_have_count(4)
 
-    # z goes back several actions, latest first.
+    # u goes back several actions, latest first.
     page.keyboard.press("g")
     page.keyboard.press("g")
     page.keyboard.press("d")
@@ -180,13 +180,12 @@ def desktop(browser):
     page.keyboard.press("d")
     expect(rows(page)).to_have_count(2)
     # Pressed at once: the second trash is undone, not the action before.
-    page.keyboard.press("z")
+    page.keyboard.press("u")
     expect(rows(page)).to_have_count(3)
-    page.keyboard.press("z")
+    page.keyboard.press("u")
     expect(rows(page)).to_have_count(4)
     # The star and its removal, further back, are still there.
     expect(page.locator(".toast")).to_contain_text("Undone: moved to the trash")
-    expect(page.locator(".toast")).to_contain_text("2 more")
 
     # Attachments open from the reader.
     row(page, "Invoice for the gala hall").click()
@@ -342,7 +341,7 @@ def desktop(browser):
     expect(page.locator(".toast")).to_contain_text("Moved to the inbox")
     expect(rows(page)).to_have_count(0)
     expect(page.locator("#thread-list")).to_contain_text("No spam.")
-    page.keyboard.press("z")
+    page.keyboard.press("u")
     expect(rows(page)).to_have_count(1)
 
     # An own folder (a Gmail label), nested.
@@ -360,9 +359,9 @@ def desktop(browser):
     page.keyboard.press("j")
     page.keyboard.press("s")
     expect(rows(page).nth(1).locator(".icon-star")).to_have_count(1)
-    page.keyboard.press("u")
+    page.keyboard.press("U")
     expect(rows(page).nth(1)).to_have_class(re.compile("unread"))
-    page.keyboard.press("u")
+    page.keyboard.press("U")
     expect(rows(page).nth(1)).not_to_have_class(re.compile("unread"))
 
     # m: move to a folder picked by typing.
@@ -391,6 +390,31 @@ def desktop(browser):
     shot(page, "06a-context-menu")
     page.keyboard.press("Escape")
     expect(menu).to_have_count(0)
+
+    # Dragged onto a folder of the sidebar, a conversation moves there; u
+    # brings it back. A plain click still opens it.
+    first = rows(page).first
+    subject = first.locator(".row-subject-text").inner_text()
+    count = rows(page).count()
+    a, b = rect(first), rect(folders(page).filter(has_text="Receipts"))
+    page.mouse.move(a["x"] + 60, a["y"] + a["height"] / 2)
+    page.mouse.down()
+    page.mouse.move(a["x"] + 40, a["y"] + 40, steps=4)
+    expect(page.locator(".drag-ghost")).to_have_text("1 conversation")
+    expect(page.locator(".thread-row.dragging")).to_have_count(1)
+    page.mouse.move(b["x"] + 30, b["y"] + b["height"] / 2, steps=8)
+    expect(folders(page).filter(has_text="Receipts")).to_have_class(re.compile("drop-target"))
+    page.wait_for_timeout(300)
+    assert page.locator(".thread-row.dragging").count() == 1, "the dragged row was drawn again"
+    shot(page, "06b-drag-to-folder")
+    page.mouse.up()
+    expect(page.locator(".toast")).to_contain_text("Moved to Receipts")
+    expect(rows(page)).to_have_count(count - 1)
+    page.keyboard.press("u")
+    expect(rows(page)).to_have_count(count)
+    expect(row(page, subject)).to_have_count(1)
+    rows(page).nth(1).click()
+    expect(rows(page).nth(1)).to_have_class(re.compile("cursor"))
 
     # Folders: renamed and deleted from their own menu, made from the sidebar.
     folders(page).filter(has_text="Travel").click(button="right")
@@ -492,7 +516,7 @@ def phone(browser):
     expect(page.locator(".toast")).to_contain_text("Moved to the trash")
     expect(rows(page)).to_have_count(count - 1)
     expect(page.locator(".reader-title")).to_be_hidden()
-    page.keyboard.press("z")
+    page.keyboard.press("u")
     expect(rows(page)).to_have_count(count)
 
     # Mail laid out for a desktop: a long subject that wraps, a 600 pixel
