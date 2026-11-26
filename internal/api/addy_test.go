@@ -32,6 +32,15 @@ func TestAddyAliases(t *testing.T) {
 	if err := a.sendingAlias("perso", "a+b", &message.Outgoing{}); err == nil {
 		t.Error("invalid alias accepted")
 	}
+	if err := a.requireAlias("perso", " "); err == nil {
+		t.Error("an addy.io account sends from its own address")
+	}
+	if err := a.requireAlias("perso", "shop"); err != nil {
+		t.Error(err)
+	}
+	if err := a.requireAlias("work", ""); err != nil {
+		t.Error(err)
+	}
 
 	// A reply to mail forwarded by addy.io: the real sender, the same alias,
 	// and one's own alias left out of the copies.

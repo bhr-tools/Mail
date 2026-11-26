@@ -130,8 +130,8 @@ select.input { cursor: pointer; }
 .search-chip .account-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--acc); }
 .search-field { display: inline-flex; align-items: center; gap: 6px; color: var(--text-dim); }
 .search-select { width: auto; max-width: 260px; height: 30px; padding: 0 8px; font-size: 0.82rem; }
-.search-people { display: flex; flex-wrap: wrap; gap: 6px; }
-.search-person { width: 170px; height: 30px; padding: 0 8px; font-size: 0.82rem; }
+.search-people { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.search-person { width: 210px; height: 30px; padding: 0 8px; font-size: 0.82rem; }
 .search-results { flex: 1; min-height: 0; padding: 0 var(--inset) calc(24px + env(safe-area-inset-bottom)); overflow-y: auto; }
 .search-month {
   position: sticky;

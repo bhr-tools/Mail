@@ -21,7 +21,7 @@ export function openAddySettings(app) {
   const submit = h('button', { type: 'submit', class: 'button primary' }, 'Save');
   const form = h('form', { class: 'auth-form addy-form' },
     h('p', { class: 'dialog-message' },
-      'Send from an alias: in the composer, write to people by their usual address and choose the alias. The message goes through addy.io, which shows the alias instead of your address.'),
+      'Send from an alias: in the composer, write to people by their usual address and choose the alias. The message goes through addy.io, which shows the alias instead of your address. These accounts never send from their own address.'),
     error,
     h('label', { class: 'field' }, h('span', { class: 'field-label' }, 'Alias domain'), domain),
     h('div', { class: 'field' },

@@ -437,7 +437,7 @@ def desktop(browser):
     expect(page.locator(".popover .menu")).to_contain_text("New folder")
     page.keyboard.press("Escape")
 
-    # addy.io: the account sends from an alias; the draft keeps the real
+    # addy.io: the account sends only from an alias; the draft keeps the real
     # address and the alias.
     page.locator("#settings-menu").click()
     page.locator(".menu-item", has_text="addy.io aliases").click()
@@ -449,10 +449,15 @@ def desktop(browser):
     expect(page.locator(".toast")).to_contain_text("addy.io settings saved")
     page.keyboard.press("c")
     compose = page.locator(".modal.compose")
-    compose.get_by_label("Alias").fill("shop")
-    expect(compose.locator(".compose-suffix")).to_have_text("@me.anonaddy.test")
+    # Never from the account's own address: Send asks for an alias.
     compose.get_by_label("To").fill("bob@example.test")
     compose.get_by_label("Subject").fill("Order 42")
+    compose.get_by_role("button", name="Send").click()
+    expect(page.locator(".toast", has_text="Choose an alias")).to_be_visible()
+    expect(compose.get_by_label("Alias")).to_be_focused()
+    shot(page, "06-addy-required")
+    compose.get_by_label("Alias").fill("shop")
+    expect(compose.locator(".compose-suffix")).to_have_text("@me.anonaddy.test")
     compose.get_by_role("button", name="Save draft").click()
     expect(page.locator(".toast")).to_contain_text("Draft saved")
     page.locator(".folder-row", has_text="Drafts").click()

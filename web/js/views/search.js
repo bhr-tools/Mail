@@ -55,9 +55,11 @@ export function openSearchPage(app, { query = '' } = {}) {
   const stateChips = h('div', { class: 'search-chips' });
   const periodSwitch = h('div', { class: 'segmented' });
   const contacts = h('datalist', { id: 'search-contacts' });
-  const personField = (key, label) => {
+  // People, not dates: next to the periods, a bare "From … To …" read as a
+  // date range.
+  const personField = (key, label, placeholder) => {
     const el = h('input', {
-      class: 'input search-person', value: form[key], placeholder: label, autocomplete: 'off', spellcheck: false,
+      class: 'input search-person', value: form[key], placeholder, autocomplete: 'off', spellcheck: false,
       attrs: { list: 'search-contacts', 'aria-label': label },
     });
     el.addEventListener('input', () => {
@@ -67,8 +69,8 @@ export function openSearchPage(app, { query = '' } = {}) {
     });
     return el;
   };
-  const fromInput = personField('from', 'From');
-  const toInput = personField('to', 'To');
+  const fromInput = personField('from', 'Sender', 'Sender');
+  const toInput = personField('to', 'Recipient', 'Recipient');
   const list = h('div', { class: 'search-results', attrs: { role: 'listbox', 'aria-label': 'Results' } });
 
   let results = [];
@@ -284,7 +286,7 @@ export function openSearchPage(app, { query = '' } = {}) {
         h('label', { class: 'search-field' }, icon('folder'), folderSelect),
         stateChips,
         periodSwitch,
-        h('div', { class: 'search-people' }, fromInput, toInput, contacts)),
+        h('div', { class: 'search-people' }, h('span', { class: 'search-field' }, icon('person')), fromInput, toInput, contacts)),
       list,
     ],
   });

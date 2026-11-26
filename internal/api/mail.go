@@ -9,6 +9,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/bhr-tools/mail/internal/config"
@@ -381,17 +382,33 @@ func (a *API) searchServer(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "Type words to look for")
 		return
 	}
-	found := 0
+	// The accounts are searched side by side: the slowest server sets the pace.
+	var (
+		wg       sync.WaitGroup
+		mu       sync.Mutex
+		found    int
+		firstErr error
+	)
 	for _, acc := range a.mail.Accounts() {
 		if req.Account != "" && acc.Config().ID != req.Account {
 			continue
 		}
-		n, err := acc.SearchServer(text, 50)
-		if err != nil {
-			fail(w, r, serverError(err))
-			return
-		}
-		found += n
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			n, err := acc.SearchServer(text, 50)
+			mu.Lock()
+			defer mu.Unlock()
+			found += n
+			if err != nil && firstErr == nil {
+				firstErr = err
+			}
+		}()
+	}
+	wg.Wait()
+	if firstErr != nil && found == 0 {
+		fail(w, r, serverError(firstErr))
+		return
 	}
 	writeJSON(w, http.StatusOK, map[string]int{"found": found})
 }

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"strings"
+	"time"
 
 	"github.com/emersion/go-imap/v2"
 	"github.com/emersion/go-imap/v2/imapclient"
@@ -158,15 +159,21 @@ func (a *Account) locate(c *imapclient.Client, f *db.Folder, messageIDs []string
 
 // SearchServer looks for messages older than the local copy, in the archive
 // and sent mail, and adds the matches to the local copy. It returns how many
-// were found.
+// were added.
 func (a *Account) SearchServer(text string, limit int) (int, error) {
 	text = strings.TrimSpace(text)
 	if text == "" {
 		return 0, nil
 	}
-	total := 0
+	// On Gmail, All Mail already holds the sent mail: one search is enough.
+	roles := []string{"archive", "sent"}
+	if a.cfg.IsGmail() {
+		roles = roles[:1]
+	}
+	start := time.Now()
+	added := 0
 	err := a.reader.with(func(c *imapclient.Client) error {
-		for _, role := range []string{"archive", "sent"} {
+		for _, role := range roles {
 			f, err := a.store.FolderByRole(a.cfg.ID, role)
 			if err != nil {
 				continue
@@ -183,7 +190,6 @@ func (a *Account) SearchServer(text string, limit int) (int, error) {
 				return err
 			}
 			found := data.AllUIDs()
-			total += len(found)
 			if len(found) > limit {
 				found = found[len(found)-limit:]
 			}
@@ -213,11 +219,13 @@ func (a *Account) SearchServer(text string, limit int) (int, error) {
 			if err := a.store.InsertMessages(f, list); err != nil {
 				return err
 			}
+			added += len(list)
 		}
 		return nil
 	})
-	if err == nil {
+	log.Printf("%s: server search %q: %d added in %s", a.cfg.ID, text, added, time.Since(start).Round(time.Millisecond))
+	if err == nil && added > 0 {
 		a.store.Changed()
 	}
-	return total, err
+	return added, err
 }

@@ -106,9 +106,9 @@ export function openCompose(app, source = {}) {
   const from = h('select', { class: 'compose-input', attrs: { 'aria-label': 'From' } },
     accounts.map((a) => h('option', { value: a.id, selected: a.id === draft.account }, `${a.name} · ${a.address}`)));
   // Sending from an addy.io alias: the root here, the domain set once in
-  // the settings. Empty sends from the account's own address.
+  // the settings. Required: the account's own address is never shown.
   const alias = h('input', {
-    class: 'compose-input', value: draft.alias || '', placeholder: 'None: send from your own address',
+    class: 'compose-input', value: draft.alias || '', placeholder: 'Required: the address recipients see',
     autocomplete: 'off', spellcheck: false, attrs: { 'aria-label': 'Alias' },
   });
   const aliasDomain = h('span', { class: 'compose-suffix' });
@@ -182,6 +182,11 @@ export function openCompose(app, source = {}) {
     if (!to.input.value.trim() && !cc.input.value.trim() && !bcc.input.value.trim()) {
       toast('Add at least one recipient', { type: 'error' });
       to.input.focus();
+      return;
+    }
+    if (!aliasRow.hidden && !alias.value.trim()) {
+      toast('Choose an alias: this account only sends through addy.io', { type: 'error' });
+      alias.focus();
       return;
     }
     if (!files.length && !forwarded.length && MENTIONS_ATTACHMENT.test(ownText(body.value))) {

@@ -156,6 +156,23 @@ func (a *API) sendingAlias(account, alias string, o *message.Outgoing) error {
 	return nil
 }
 
+// requireAlias refuses to send from the own address of an account verified
+// on addy.io: that address is only meant to be reached through its aliases.
+// Drafts may still be saved without an alias.
+func (a *API) requireAlias(account, alias string) error {
+	if strings.TrimSpace(alias) != "" {
+		return nil
+	}
+	settings, err := a.store.AddySettings()
+	if err != nil {
+		return err
+	}
+	if settings.Enabled(account) {
+		return invalid("Choose an alias: this account only sends through addy.io")
+	}
+	return nil
+}
+
 func (a *API) findByMessageID(account, messageID string) *db.Message {
 	m, err := a.store.MessageByMessageID(account, messageID)
 	if err != nil {
@@ -265,6 +282,10 @@ func (a *API) readOutgoing(w http.ResponseWriter, r *http.Request) (*outgoingReq
 func (a *API) send(w http.ResponseWriter, r *http.Request) {
 	req, o, err := a.readOutgoing(w, r)
 	if err != nil {
+		fail(w, r, err)
+		return
+	}
+	if err := a.requireAlias(req.Account, req.Alias); err != nil {
 		fail(w, r, err)
 		return
 	}
