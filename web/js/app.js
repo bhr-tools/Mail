@@ -3,7 +3,7 @@
 import { api, onUnauthorized } from './api.js';
 import { h, icon } from './dom.js';
 import { clock } from './format.js';
-import { closeAllModals, closePopover, confirmDialog, openContextMenu, openMenu, openModal, promptDialog, toast, topModal } from './ui/overlay.js';
+import { closePopover, confirmDialog, openContextMenu, openMenu, openModal, promptDialog, toast, topModal } from '/kit/js/overlay.js';
 import { folderLabel, isCustom, navigation, renderSidebar } from './views/sidebar.js';
 import { renderList, threadKey, updateRows } from './views/list.js';
 import { renderBody, renderReader, scrollToFocused } from './views/reader.js';
@@ -11,7 +11,8 @@ import { openCompose } from './views/compose.js';
 import { openAddySettings } from './views/addy.js';
 import { describeQuery, openSearchPage } from './views/search.js';
 import { initKeys } from './keys.js';
-import { edgeSwipe, pullToRefresh } from './ui/swipe.js';
+import { edgeSwipe, pullToRefresh } from '/kit/js/swipe.js';
+import { createLock } from '/kit/js/lock.js';
 
 const COLORS = ['pine', 'rose', 'iris', 'gold', 'foam', 'love'];
 const PAGE = 50;
@@ -49,7 +50,6 @@ const MOVES = new Set(['done', 'trash', 'inbox', 'move', 'delete']);
 class App {
   constructor() {
     this.state = {
-      auth: { no_auth: false, has_password: true, authenticated: false },
       accounts: [],
       addy: { domain: '', accounts: [] },
       version: 0,
@@ -71,6 +71,11 @@ class App {
     this.listSeq = 0;
     this.watching = false;
     this.handleKey = () => {};
+    this.lockScreen = createLock({ appName: 'Mail', onUnlocked: () => this.afterLogin() });
+  }
+
+  get authenticated() {
+    return this.lockScreen.status.authenticated;
   }
 
   async start() {
@@ -78,7 +83,7 @@ class App {
     initKeys(this);
     onUnauthorized(() => this.showLogin());
     document.addEventListener('visibilitychange', () => {
-      if (document.visibilityState === 'visible' && this.state.auth.authenticated) this.refresh();
+      if (document.visibilityState === 'visible' && this.authenticated) this.refresh();
     });
     window.addEventListener('hashchange', () => this.handleHash());
     renderReader(this);
@@ -87,18 +92,14 @@ class App {
 
   async boot() {
     try {
-      const status = await api.auth.status();
-      this.state.auth = status;
-      if (!status.no_auth && !status.has_password) return this.showSetup();
-      if (!status.authenticated) return this.showLogin();
-      await this.afterLogin();
+      await this.lockScreen.start();
     } catch (err) {
       this.showFatal(err);
     }
   }
 
   async afterLogin() {
-    this.state.auth = { ...this.state.auth, has_password: true, authenticated: true };
+    document.getElementById('auth-menu').hidden = this.lockScreen.status.no_auth;
     await this.loadAccounts();
     await this.loadThreads();
     this.watch();
@@ -192,7 +193,7 @@ class App {
   async watch() {
     if (this.watching) return;
     this.watching = true;
-    while (this.state.auth.authenticated) {
+    while (this.authenticated) {
       try {
         const { version } = await api.changes(this.state.version);
         if (version !== this.state.version) {
@@ -967,7 +968,7 @@ class App {
 
   /** #mailto=mailto:… (protocol handler) or #compose?to=… opens the composer. */
   handleHash() {
-    if (!this.state.auth.authenticated) return;
+    if (!this.authenticated) return;
     const hash = decodeURIComponent(location.hash.slice(1));
     let url;
     if (hash.startsWith('mailto=')) url = hash.slice(7);
@@ -990,22 +991,22 @@ class App {
       className: 'help',
       body: h('div', { class: 'help-grid' },
         h('section', null,
-          h('h3', { class: 'field-label' }, 'Move'),
+          h('h3', { class: 'help-title' }, 'Move'),
           row(['j', 'k'], 'Next / previous conversation (shown beside)'),
           row(['g', 'g'], 'First conversation'),
           row(['G'], 'Last conversation'),
           row(['Ctrl', 'd'], 'Scroll the conversation down (Ctrl u: up)'),
-          h('h3', { class: 'field-label' }, 'Search'),
+          h('h3', { class: 'help-title' }, 'Search'),
           row(['/'], 'Search, with filters (account, folder…)'),
           row(['↓', '↑'], 'Through the results (j k outside the fields)'),
           row(['Enter'], 'Open the conversation'),
           row(['Ctrl', 'Enter'], 'Show the results in the list'),
-          h('h3', { class: 'field-label' }, 'Folders'),
+          h('h3', { class: 'help-title' }, 'Folders'),
           row(['J', 'K'], 'Next / previous folder'),
           row(['+'], 'Fold / unfold the account'),
           row(['&', 'é', '"', "'"], 'Each account')),
         h('section', null,
-          h('h3', { class: 'field-label' }, 'Act'),
+          h('h3', { class: 'help-title' }, 'Act'),
           row(['A'], 'Done (archive)'),
           row(['d'], 'Trash'),
           row(['I'], 'Back to the inbox'),
@@ -1014,7 +1015,7 @@ class App {
           row(['m'], 'Move to a folder (type a new name to create it)'),
           row(['Space'], 'Select and go to the next'),
           row(['z'], 'Undo'),
-          h('h3', { class: 'field-label' }, 'Write and read'),
+          h('h3', { class: 'help-title' }, 'Write and read'),
           row(['c'], 'New message'),
           row(['r', 'R', 'f'], 'Reply, reply all, forward'),
           row(['e'], 'Finish a draft'),
@@ -1048,108 +1049,9 @@ class App {
   // Authentication
   // -------------------------------------------------------------------------
 
-  passwordForm({ title, intro, fields, submitLabel, dismissible, onSubmit }) {
-    const error = h('div', { class: 'form-error', hidden: true });
-    const inputs = fields.map((f) => h('input', {
-      type: 'password', class: 'input', placeholder: f.placeholder, autocomplete: f.autocomplete, attrs: { 'aria-label': f.label },
-    }));
-    const submit = h('button', { type: 'submit', class: 'button primary wide' }, submitLabel);
-    const form = h('form', { class: 'auth-form' },
-      intro ? h('p', { class: 'dialog-message' }, intro) : null,
-      error,
-      fields.map((f, i) => h('label', { class: 'field' }, h('span', { class: 'field-label' }, f.label), inputs[i])),
-      submit);
-    let modal;
-    form.addEventListener('submit', async (e) => {
-      e.preventDefault();
-      error.hidden = true;
-      submit.disabled = true;
-      try {
-        const message = await onSubmit(inputs.map((i) => i.value));
-        if (message) {
-          error.textContent = message;
-          error.hidden = false;
-        } else {
-          modal.close();
-        }
-      } catch (err) {
-        error.textContent = err.message;
-        error.hidden = false;
-      } finally {
-        submit.disabled = false;
-      }
-    });
-    modal = openModal({ title, body: form, className: 'dialog auth', dismissible });
-    return modal;
-  }
-
-  showSetup() {
-    closeAllModals({ keepUndismissible: false });
-    this.state.auth.authenticated = false;
-    this.passwordForm({
-      title: 'Welcome to Mail',
-      intro: 'Choose a master password to protect this instance. You can change it later.',
-      fields: [
-        { label: 'Master password', placeholder: 'At least 4 characters', autocomplete: 'new-password' },
-        { label: 'Confirm password', placeholder: 'Repeat the password', autocomplete: 'new-password' },
-      ],
-      submitLabel: 'Set password and continue',
-      dismissible: false,
-      onSubmit: async ([password, confirm]) => {
-        if (password.length < 4) return 'The password must be at least 4 characters long.';
-        if (password !== confirm) return 'The passwords do not match.';
-        await api.auth.setup(password);
-        this.afterLogin();
-        return null;
-      },
-    });
-  }
-
   showLogin() {
-    if (topModal()?.el.classList.contains('auth')) return;
-    closeAllModals({ keepUndismissible: false });
     closePopover();
-    this.state.auth.authenticated = false;
-    this.passwordForm({
-      title: 'Mail is locked',
-      intro: 'Enter your master password to unlock.',
-      fields: [{ label: 'Password', placeholder: 'Master password', autocomplete: 'current-password' }],
-      submitLabel: 'Unlock',
-      dismissible: false,
-      onSubmit: async ([password]) => {
-        if (!password) return 'Enter your password.';
-        await api.auth.login(password);
-        this.afterLogin();
-        return null;
-      },
-    });
-  }
-
-  changePassword() {
-    this.passwordForm({
-      title: 'Change password',
-      fields: [
-        { label: 'Current password', placeholder: 'Current master password', autocomplete: 'current-password' },
-        { label: 'New password', placeholder: 'At least 4 characters', autocomplete: 'new-password' },
-        { label: 'Confirm new password', placeholder: 'Repeat the new password', autocomplete: 'new-password' },
-      ],
-      submitLabel: 'Update password',
-      dismissible: true,
-      onSubmit: async ([current, next, confirm]) => {
-        if (next.length < 4) return 'The new password must be at least 4 characters long.';
-        if (next !== confirm) return 'The new passwords do not match.';
-        await api.auth.changePassword(current, next);
-        toast('Password updated. Other devices were signed out.', { type: 'success' });
-        return null;
-      },
-    });
-  }
-
-  async lock() {
-    try {
-      await api.auth.logout();
-    } catch { /* locked anyway */ }
-    this.showLogin();
+    this.lockScreen.showLogin();
   }
 
   showFatal(err) {
@@ -1208,12 +1110,10 @@ class App {
       { label: 'Keyboard shortcuts', icon: 'search', hint: '?', run: () => this.openHelp() },
       { label: 'Open mailto: links here', icon: 'link', run: () => this.registerMailto() },
       { label: 'addy.io aliases', icon: 'mail', run: () => openAddySettings(this) },
-      ...(this.state.auth.no_auth ? [] : [
-        'separator',
-        { label: 'Change password', icon: 'key', run: () => this.changePassword() },
-        { label: 'Lock', icon: 'lock', run: () => this.lock() },
-      ]),
     ], { title: 'Settings' }));
+    const lock = $('auth-menu');
+    lock.append(icon('lock'));
+    lock.addEventListener('click', () => this.lockScreen.menu(lock));
   }
 }
 

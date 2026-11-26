@@ -1,25 +1,26 @@
 // Package api exposes the mail over a JSON HTTP API, for the web app.
+// Authentication and the JSON helpers come from the kit.
 package api
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
-	"io"
+	"fmt"
 	"log"
 	"net/http"
 	"strconv"
-	"sync"
 	"time"
 
+	"github.com/bhr-tools/kit/auth"
+	"github.com/bhr-tools/kit/httpx"
 	"github.com/bhr-tools/mail/internal/db"
 	"github.com/bhr-tools/mail/internal/imapsync"
 	"github.com/bhr-tools/mail/internal/imgproxy"
 )
 
 const (
-	maxJSONBody   = 1 << 20  // 1 MiB
 	maxUploadBody = 35 << 20 // attachments of a message
+	// sessionCookie keeps its first name: renaming it would sign everybody out.
 	sessionCookie = "mail_session"
 	// changesWait is how long a request for changes waits before answering
 	// "nothing new" (below the server's write timeout).
@@ -31,28 +32,33 @@ type API struct {
 	store  *db.Store
 	mail   *imapsync.Manager
 	images *imgproxy.Proxy
-	noAuth bool
-	// loginMu serializes password checks; a failed attempt holds it for a
-	// moment, which caps brute-force attempts without any bookkeeping.
-	loginMu sync.Mutex
+	auth   *auth.Auth
 }
 
 // New returns the API. With noAuth, every request is accepted without login.
-func New(store *db.Store, mail *imapsync.Manager, images *imgproxy.Proxy, noAuth bool) *API {
-	return &API{store: store, mail: mail, images: images, noAuth: noAuth}
+func New(store *db.Store, mail *imapsync.Manager, images *imgproxy.Proxy, noAuth bool) (*API, error) {
+	a := &API{store: store, mail: mail, images: images}
+	var err error
+	if a.auth, err = auth.New(store.DB(), sessionCookie, noAuth); err != nil {
+		return nil, fmt.Errorf("auth: %w", err)
+	}
+	return a, nil
 }
+
+// Helpers of the kit, under the names the handlers use.
+var (
+	writeJSON  = httpx.WriteJSON
+	writeError = httpx.WriteError
+	decode     = httpx.Decode
+)
 
 // Handler returns the API routes, wrapped in their middlewares.
 func (a *API) Handler() http.Handler {
 	mux := http.NewServeMux()
 	open := func(pattern string, h http.HandlerFunc) { mux.HandleFunc(pattern, h) }
-	auth := func(pattern string, h http.HandlerFunc) { mux.Handle(pattern, a.requireAuth(h)) }
+	auth := func(pattern string, h http.HandlerFunc) { mux.Handle(pattern, a.auth.Require(h)) }
 
-	open("GET /api/auth/status", a.authStatus)
-	open("POST /api/auth/setup", a.authSetup)
-	open("POST /api/auth/login", a.authLogin)
-	open("POST /api/auth/logout", a.authLogout)
-	auth("POST /api/auth/change-password", a.authChangePassword)
+	a.auth.Routes(mux)
 
 	auth("GET /api/accounts", a.accounts)
 	auth("PUT /api/accounts/order", a.setAccountOrder)
@@ -87,47 +93,7 @@ func (a *API) Handler() http.Handler {
 	open("/api/", func(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusNotFound, "Unknown API endpoint")
 	})
-	return rejectCrossSite(mux)
-}
-
-// rejectCrossSite refuses state-changing requests sent by another site
-// (CSRF). Browsers label every request with Sec-Fetch-Site; requests without
-// it (curl, scripts) are not browser-driven and are let through.
-func rejectCrossSite(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodGet && r.Method != http.MethodHead && r.Header.Get("Sec-Fetch-Site") == "cross-site" {
-			writeError(w, http.StatusForbidden, "Cross-site request refused")
-			return
-		}
-		next.ServeHTTP(w, r)
-	})
-}
-
-func (a *API) requireAuth(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if !a.authenticated(r) {
-			writeJSON(w, http.StatusUnauthorized, map[string]any{"error": "Authentication required", "auth_required": true})
-			return
-		}
-		next.ServeHTTP(w, r)
-	})
-}
-
-// authenticated reports whether r may use the API. Until a password is set,
-// the instance is open (first-run setup).
-func (a *API) authenticated(r *http.Request) bool {
-	if a.noAuth {
-		return true
-	}
-	hasPassword, err := a.store.HasPassword()
-	if err != nil {
-		return false
-	}
-	if !hasPassword {
-		return true
-	}
-	c, err := r.Cookie(sessionCookie)
-	return err == nil && a.store.ValidateSession(c.Value)
+	return httpx.RejectCrossSite(mux)
 }
 
 // changes waits until the mail changes, then returns the new version.
@@ -142,38 +108,18 @@ func (a *API) changes(w http.ResponseWriter, r *http.Request) {
 // Helpers
 // ---------------------------------------------------------------------------
 
-func writeJSON(w http.ResponseWriter, status int, v any) {
-	w.Header().Set("Content-Type", "application/json")
-	w.Header().Set("Cache-Control", "no-store")
-	w.WriteHeader(status)
-	if err := json.NewEncoder(w).Encode(v); err != nil {
-		log.Printf("write response: %v", err)
-	}
-}
-
-func writeError(w http.ResponseWriter, status int, msg string) {
-	writeJSON(w, status, map[string]string{"error": msg})
-}
-
-// fail answers with the status matching err: 404, 400 for invalid input, 502
-// when the mail server is unreachable or refuses, or 500 (logged, with a
-// generic message).
+// fail answers like httpx.Fail (404, 400, 500), plus 410 for a message gone
+// from the server and 502 when the mail server is unreachable or refuses.
 func fail(w http.ResponseWriter, r *http.Request, err error) {
-	var invalidInput *db.ValidationError
 	var mailErr *mailError
 	switch {
-	case errors.Is(err, db.ErrNotFound):
-		writeError(w, http.StatusNotFound, "Not found")
 	case errors.Is(err, imapsync.ErrGone):
 		writeError(w, http.StatusGone, "This message is no longer on the server")
-	case errors.As(err, &invalidInput):
-		writeError(w, http.StatusBadRequest, invalidInput.Msg)
 	case errors.As(err, &mailErr):
 		log.Printf("%s %s: %v", r.Method, r.URL.Path, mailErr.err)
 		writeError(w, http.StatusBadGateway, mailErr.err.Error())
 	default:
-		log.Printf("%s %s: %v", r.Method, r.URL.Path, err)
-		writeError(w, http.StatusInternalServerError, "Internal server error")
+		httpx.Fail(w, r, err)
 	}
 }
 
@@ -195,25 +141,6 @@ func serverError(err error) error {
 
 func invalid(msg string) error {
 	return &db.ValidationError{Msg: msg}
-}
-
-// decode reads a JSON request body into dst. On failure it answers the
-// request and returns false.
-func decode(w http.ResponseWriter, r *http.Request, dst any) bool {
-	body := http.MaxBytesReader(w, r.Body, maxJSONBody)
-	if err := json.NewDecoder(body).Decode(dst); err != nil {
-		var tooLarge *http.MaxBytesError
-		switch {
-		case errors.As(err, &tooLarge):
-			writeError(w, http.StatusRequestEntityTooLarge, "Request body too large")
-		case errors.Is(err, io.EOF):
-			writeError(w, http.StatusBadRequest, "Request body is empty")
-		default:
-			writeError(w, http.StatusBadRequest, "Invalid JSON: "+err.Error())
-		}
-		return false
-	}
-	return true
 }
 
 func pathID(r *http.Request) (int64, error) {

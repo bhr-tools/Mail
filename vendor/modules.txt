@@ -2,6 +2,13 @@
 ## explicit
 github.com/aymerick/douceur/css
 github.com/aymerick/douceur/parser
+# github.com/bhr-tools/kit v0.1.9
+## explicit; go 1.26.0
+github.com/bhr-tools/kit/auth
+github.com/bhr-tools/kit/httpx
+github.com/bhr-tools/kit/server
+github.com/bhr-tools/kit/store
+github.com/bhr-tools/kit/web
 # github.com/dustin/go-humanize v1.1.0
 ## explicit; go 1.21
 github.com/dustin/go-humanize

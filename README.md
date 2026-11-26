@@ -12,7 +12,7 @@ A minimalist, self-hosted mail client in the spirit of Get Done, Focus and Calen
 - **Full Vim navigation:** fully operable from the keyboard, AZERTY included.
 - **At home on a phone:** installable on the home screen. Swipe a conversation left to throw it away, right to move it; pull the list down to check for new mail; swipe from the left edge of a conversation to go back.
 - **Quiet:** no notification, no badge, no tracking. New mail shows when you look.
-- **Rosé Pine palette:** Moon (dark) and Dawn (light) themes, following the system setting.
+- **Rosé Pine palette:** main (dark) and Dawn (light) themes, following the system setting; shared with the other apps through [bhr-tools/kit](https://github.com/bhr-tools/kit).
 - **One binary:** a single Go binary with embedded SQLite and web app, packaged with Nix Flakes (multi-instance NixOS module).
 
 ## Keyboard shortcuts

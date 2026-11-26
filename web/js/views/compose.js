@@ -4,7 +4,7 @@
 import { api } from '../api.js';
 import { h, icon } from '../dom.js';
 import { fileSize, formatAddresses } from '../format.js';
-import { confirmDialog, openModal, toast } from '../ui/overlay.js';
+import { confirmDialog, openModal, toast } from '/kit/js/overlay.js';
 import { addyDomain } from './addy.js';
 
 // "attached", "pièce jointe", "ci-joint"… in the new text (quotes left out).

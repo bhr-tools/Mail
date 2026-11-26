@@ -90,7 +90,7 @@ func (a *API) accounts(w http.ResponseWriter, r *http.Request) {
 		fail(w, r, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"accounts": list, "version": a.store.Version(), "no_auth": a.noAuth, "addy": addySettings})
+	writeJSON(w, http.StatusOK, map[string]any{"accounts": list, "version": a.store.Version(), "addy": addySettings})
 }
 
 // setAddy records the addy.io setting.

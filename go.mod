@@ -3,12 +3,12 @@ module github.com/bhr-tools/mail
 go 1.26.0
 
 require (
+	github.com/bhr-tools/kit v0.1.9
 	github.com/emersion/go-imap/v2 v2.0.0-beta.8
 	github.com/emersion/go-message v0.18.2
 	github.com/emersion/go-sasl v0.0.0-20241020182733-b788ff22d5a6
 	github.com/emersion/go-smtp v0.25.0
 	github.com/microcosm-cc/bluemonday v1.0.27
-	modernc.org/sqlite v1.61.0
 )
 
 require (
@@ -25,4 +25,5 @@ require (
 	modernc.org/libc v1.79.0 // indirect
 	modernc.org/mathutil v1.7.1 // indirect
 	modernc.org/memory v1.12.1 // indirect
+	modernc.org/sqlite v1.61.0 // indirect
 )

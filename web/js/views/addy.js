@@ -4,7 +4,7 @@
 
 import { api } from '../api.js';
 import { h } from '../dom.js';
-import { openModal, toast } from '../ui/overlay.js';
+import { openModal, toast } from '/kit/js/overlay.js';
 
 export function openAddySettings(app) {
   const current = app.state.addy || { domain: '', accounts: [] };

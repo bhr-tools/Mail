@@ -4,7 +4,7 @@
 
 import { api } from '../api.js';
 import { h, icon } from '../dom.js';
-import { openModal, toast } from '../ui/overlay.js';
+import { openModal, toast } from '/kit/js/overlay.js';
 import { PERIODS, emptyForm, fromQuery, hasCriteria, toQuery } from '../search-query.js';
 import { ROLE_LABELS, folderLabel, isCustom } from './sidebar.js';
 import { rowContent, threadKey } from './list.js';

@@ -4,7 +4,7 @@
 
 import { api } from '../api.js';
 import { h, icon } from '../dom.js';
-import { openMenu } from '../ui/overlay.js';
+import { openMenu } from '/kit/js/overlay.js';
 import { fileSize, formatAddresses, longDate, personName, renderText } from '../format.js';
 
 /** Card of a message, kept between renders so frames are not reloaded. */

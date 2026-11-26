@@ -1,12 +1,9 @@
 // HTTP client for the Mail API. Every call returns the decoded JSON or
 // throws an ApiError whose message can be shown to the user.
 
-export class ApiError extends Error {
-  constructor(message, status) {
-    super(message);
-    this.status = status;
-  }
-}
+import { ApiError } from '/kit/js/errors.js';
+
+export { ApiError };
 
 let unauthorizedHandler = () => {};
 
@@ -57,15 +54,6 @@ function outgoing(message, files) {
 }
 
 export const api = {
-  auth: {
-    status: () => get('/api/auth/status'),
-    setup: (password) => post('/api/auth/setup', { password }),
-    login: (password) => post('/api/auth/login', { password }),
-    logout: () => post('/api/auth/logout'),
-    changePassword: (oldPassword, newPassword) =>
-      post('/api/auth/change-password', { old_password: oldPassword, new_password: newPassword }),
-  },
-
   accounts: () => get('/api/accounts'),
   setAccountOrder: (accounts) => put('/api/accounts/order', { accounts }),
   /** Resolves to the setting as saved { domain, accounts }. */

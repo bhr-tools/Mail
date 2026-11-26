@@ -2,7 +2,7 @@
 
 import { h, icon } from '../dom.js';
 import { personName, shortDate } from '../format.js';
-import { deferWhileSwiping, swipeable } from '../ui/swipe.js';
+import { deferWhileSwiping, swipeable } from '/kit/js/swipe.js';
 
 export const threadKey = (t) => `${t.account}\u0000${t.thread}`;
 

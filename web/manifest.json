@@ -4,8 +4,8 @@
   "description": "Minimalist mail with Vim navigation & Rosé Pine design",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#232136",
-  "theme_color": "#232136",
+  "background_color": "#191724",
+  "theme_color": "#191724",
   "icons": [
     {
       "src": "/icons/icon.svg",

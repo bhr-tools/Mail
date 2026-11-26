@@ -2,7 +2,7 @@
 // action, run when let go far enough; the list pulled down past its top
 // checks for new mail. A mouse is left alone: the keys do this on a desktop.
 
-import { h, icon } from '../dom.js';
+import { h, icon } from './dom.js';
 
 const START = 10; // pixels moved before a press is a swipe
 const PULL = 70; // pixels pulled past the top to check for mail

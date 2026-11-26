@@ -6,7 +6,7 @@
 // Components that handle a key themselves call preventDefault(), and this
 // handler then ignores it. The frame of a message forwards its keys here.
 
-import { escapeTopLayer, topModal, isPopoverOpen } from './ui/overlay.js';
+import { escapeTopLayer, topModal, isPopoverOpen } from '/kit/js/overlay.js';
 import { isTextInput } from './dom.js';
 
 // The digit row of an AZERTY keyboard, and of a QWERTY one.

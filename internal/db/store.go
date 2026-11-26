@@ -6,25 +6,21 @@ package db
 import (
 	"context"
 	"database/sql"
-	"errors"
-	"fmt"
-	"os"
-	"path/filepath"
 	"sync"
 
-	_ "modernc.org/sqlite"
+	"github.com/bhr-tools/kit/httpx"
+	kitstore "github.com/bhr-tools/kit/store"
 )
 
-// ErrNotFound is returned when the requested row does not exist.
-var ErrNotFound = errors.New("not found")
+// ErrNotFound is returned when the requested row does not exist (the kit's,
+// so httpx.Fail answers 404).
+var ErrNotFound = httpx.ErrNotFound
 
 // ValidationError reports rejected input. Its message is meant for the user.
-type ValidationError struct{ Msg string }
-
-func (e *ValidationError) Error() string { return e.Msg }
+type ValidationError = httpx.ValidationError
 
 func invalid(format string, args ...any) error {
-	return &ValidationError{Msg: fmt.Sprintf(format, args...)}
+	return httpx.Invalid(format, args...)
 }
 
 // Store is safe for concurrent use.
@@ -46,25 +42,15 @@ type querier interface {
 
 // Open opens (creating it if needed) the database at path and migrates it.
 func Open(path string) (*Store, error) {
-	if err := os.MkdirAll(filepath.Dir(path), 0o750); err != nil {
-		return nil, fmt.Errorf("create database directory: %w", err)
-	}
-	dsn := path + "?_pragma=foreign_keys(1)&_pragma=journal_mode(WAL)&_pragma=busy_timeout(5000)&_pragma=synchronous(NORMAL)"
-	sqlDB, err := sql.Open("sqlite", dsn)
+	sqlDB, err := kitstore.Open(path, migrations)
 	if err != nil {
-		return nil, fmt.Errorf("open database: %w", err)
+		return nil, err
 	}
-	// A single connection serializes every statement. For one person's mail
-	// this costs nothing and rules out "database is locked" errors.
-	sqlDB.SetMaxOpenConns(1)
-
-	s := &Store{db: sqlDB, version: 1, wake: make(chan struct{})}
-	if err := s.migrate(); err != nil {
-		sqlDB.Close()
-		return nil, fmt.Errorf("migrate database: %w", err)
-	}
-	return s, nil
+	return &Store{db: sqlDB, version: 1, wake: make(chan struct{})}, nil
 }
+
+// DB is the database, shared with the kit's auth.
+func (s *Store) DB() *sql.DB { return s.db }
 
 // Close closes the database.
 func (s *Store) Close() error {
@@ -111,19 +97,10 @@ func (s *Store) WaitChange(ctx context.Context, since uint64) uint64 {
 }
 
 // tx runs fn inside a transaction, committed only if fn returns nil.
-func (s *Store) tx(fn func(tx *sql.Tx) error) error {
-	tx, err := s.db.Begin()
-	if err != nil {
-		return err
-	}
-	defer tx.Rollback()
-	if err := fn(tx); err != nil {
-		return err
-	}
-	return tx.Commit()
-}
+func (s *Store) tx(fn func(tx *sql.Tx) error) error { return kitstore.Tx(s.db, fn) }
 
-// migrations are applied in order; PRAGMA user_version records how many ran.
+// migrations are applied in order by the kit (PRAGMA user_version records
+// how many ran). The auth tables of the first one are the kit's.
 // Never edit a released migration: append a new one instead.
 var migrations = []string{
 	// 1: base schema.
@@ -232,33 +209,8 @@ var migrations = []string{
 	);`,
 }
 
-func (s *Store) migrate() error {
-	var version int
-	if err := s.db.QueryRow("PRAGMA user_version").Scan(&version); err != nil {
-		return err
-	}
-	for i := version; i < len(migrations); i++ {
-		err := s.tx(func(tx *sql.Tx) error {
-			if _, err := tx.Exec(migrations[i]); err != nil {
-				return err
-			}
-			_, err := tx.Exec(fmt.Sprintf("PRAGMA user_version = %d", i+1))
-			return err
-		})
-		if err != nil {
-			return fmt.Errorf("migration %d: %w", i+1, err)
-		}
-	}
-	return nil
-}
-
 func exists(q querier, query string, args ...any) (bool, error) {
-	var one int
-	err := q.QueryRow(query, args...).Scan(&one)
-	if errors.Is(err, sql.ErrNoRows) {
-		return false, nil
-	}
-	return err == nil, err
+	return kitstore.Exists(q, query, args...)
 }
 
 // placeholders returns "?, ?, ?" for n values.

@@ -3,9 +3,13 @@
 
   inputs = {
     nixpkgs.url = "github:nixos/nixpkgs/nixos-unstable";
+    kit = {
+      url = "github:bhr-tools/kit";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
   };
 
-  outputs = { self, nixpkgs }:
+  outputs = { self, nixpkgs, kit }:
     let
       systems = [ "x86_64-linux" "aarch64-linux" ];
       forAllSystems = f: nixpkgs.lib.genAttrs systems (system: f nixpkgs.legacyPackages.${system});
@@ -44,7 +48,7 @@
         };
       });
 
-      nixosModules.default = import ./nixos-module.nix self;
+      nixosModules.default = import ./nixos-module.nix { inherit self kit; };
       homeManagerModules.default = import ./hm-module.nix self;
     };
 }

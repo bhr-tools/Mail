@@ -11,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/bhr-tools/kit/auth"
 	"github.com/bhr-tools/mail/internal/config"
 	"github.com/bhr-tools/mail/internal/db"
 	"github.com/bhr-tools/mail/internal/imapsync"
@@ -48,7 +49,11 @@ func setup(t *testing.T) (*httptest.Server, *db.Store) {
 		}
 		time.Sleep(50 * time.Millisecond)
 	}
-	api := httptest.NewServer(New(store, m, imgproxy.New(false), false).Handler())
+	a, err := New(store, m, imgproxy.New(false), false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	api := httptest.NewServer(a.Handler())
 	t.Cleanup(api.Close)
 	return api, store
 }
@@ -69,7 +74,11 @@ func get(t *testing.T, url string, cookie *http.Cookie) *http.Response {
 
 func TestLockedOnceAPasswordIsSet(t *testing.T) {
 	srv, store := setup(t)
-	if err := store.SetInitialPassword("correct horse"); err != nil {
+	locks, err := auth.New(store.DB(), sessionCookie, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := locks.SetInitialPassword("correct horse"); err != nil {
 		t.Fatal(err)
 	}
 	newsletter, err := store.Threads(db.Filter{Roles: []string{config.Inbox}, Match: `"books"*`})
