@@ -257,7 +257,7 @@ select.input { cursor: pointer; }
 .folder-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .folder-count { color: var(--text-muted); font-size: 0.76rem; font-variant-numeric: tabular-nums; }
 .folder-row.has-unread .folder-count { color: var(--accent); font-weight: 700; }
-.sidebar-backdrop { display: none; }
+.phone-title { display: none; }
 
 /* ==========================================================================
    Conversation list
@@ -280,7 +280,7 @@ select.input { cursor: pointer; }
   padding: 0 10px 0 18px;
   border-bottom: 1px solid var(--border);
 }
-.menu-toggle, .back-button { display: none; }
+.menu-toggle, .back-button, .back-label-phone { display: none; }
 .list-title {
   flex: 1;
   min-width: 0;
@@ -521,36 +521,53 @@ select.compose-input { cursor: pointer; }
   .input, .picker-input, .compose-input, .compose-body { font-size: 16px; }
   /* A full-screen page, as every dialog on a phone (kit). */
   .modal.compose { width: 100%; height: 100%; }
+  /* Save draft and Send at the bottom, within thumb reach; the bin and the
+     paperclip beside them. */
+  .modal.compose .modal-footer { gap: 8px; padding: 10px 16px calc(10px + env(safe-area-inset-bottom)); background: var(--surface); }
+  .modal.compose .modal-footer .button { height: 48px; border-radius: var(--r-xl); font-size: var(--fs-lg); }
+  .modal.compose .modal-footer .button.ghost { width: 44px; justify-content: center; padding: 0; }
+  .modal.compose .modal-footer .button-label, .modal.compose .modal-footer .spacer, .modal.compose .modal-footer .sending:empty { display: none; }
+  .modal.compose .modal-footer .button:not(.ghost) { flex: 1; justify-content: center; }
+  .modal.compose .modal-footer .button.primary { flex: 1.4; }
 
-  .sidebar {
+  /* No drawer: the sidebar is the Folders page, shown by the Folders tab
+     (body.show-folders) in place of the list. */
+  .sidebar { display: none; }
+  body.show-folders .sidebar {
     position: fixed;
-    inset: 0 auto 0 0;
+    inset: 0 0 calc(var(--tabbar-h) + env(safe-area-inset-bottom)) 0;
     z-index: 200;
-    width: min(300px, 85vw);
-    padding-top: env(safe-area-inset-top);
-    padding-bottom: env(safe-area-inset-bottom);
-    transform: translateX(-100%);
-    transition: transform 0.25s cubic-bezier(0.3, 1, 0.3, 1), box-shadow 0.25s;
+    display: flex;
+    width: auto;
+    padding: 0 16px 16px;
+    border: none;
+    background: var(--bg);
   }
-  .sidebar.open { transform: none; box-shadow: var(--shadow); }
-  .sidebar-backdrop {
-    position: fixed;
-    inset: 0;
-    z-index: 190;
-    display: block;
-    background: var(--backdrop);
-    opacity: 0;
-    pointer-events: none;
-    transition: opacity 0.25s;
-  }
-  .sidebar-backdrop.open { opacity: 1; pointer-events: auto; }
+  body.show-folders .list-pane { display: none; }
+  .sidebar-header { position: sticky; top: 0; z-index: 1; height: auto; padding: max(14px, env(safe-area-inset-top)) 0 12px; background: var(--bg); align-items: flex-end; }
+  .sidebar-header .brand, .compose-button { display: none; }
+  .phone-title { display: block; flex: 1; font-size: var(--fs-title); font-weight: 800; letter-spacing: -0.025em; line-height: 1.15; }
+  .nav-section { min-height: 36px; margin-top: 14px; font-size: 0.74rem; }
+  /* Every folder is listed: nothing to fold. */
+  .nav-chevron { display: none; }
   .folder-row { min-height: 42px; font-size: 0.94rem; }
 
   .list-pane { width: 100%; border-right: none; }
   /* Sticky with a background, iOS 26 extends its colour under the status
      bar instead of blurring the top of the page. */
   .pane-header { position: sticky; top: 0; z-index: 10; background: var(--bg); padding: max(8px, env(safe-area-inset-top)) 8px 8px; height: auto; min-height: 52px; }
-  .menu-toggle, .back-button { display: inline-flex; color: var(--text); }
+  /* "‹ Inbox" back to the list, as every pushed page. */
+  .back-button { display: inline-flex; gap: 2px; width: auto; padding: 0 6px 0 0; color: var(--accent); font-size: var(--fs-lg); }
+  .back-button .icon-arrowLeft { display: none; }
+  .back-label-phone { display: inline-flex; align-items: center; gap: 2px; }
+  /* Large title; in a folder, "‹ Folders" above it goes back. */
+  .pane-header { flex-wrap: wrap; align-items: flex-end; padding: max(14px, env(safe-area-inset-top)) 8px 10px 16px; border-bottom: none; }
+  .list-title { flex: 1 1 auto; font-size: var(--fs-title); font-weight: 800; letter-spacing: -0.025em; line-height: 1.15; white-space: normal; }
+  .list-title .muted { display: block; font-size: var(--fs-md); font-weight: 500; letter-spacing: 0; }
+  #search-button { display: none; }
+  body.in-folder .menu-toggle { display: inline-flex; flex-basis: 100%; justify-content: flex-start; gap: 2px; width: auto; height: 32px; margin-left: -6px; color: var(--accent); font-size: var(--fs-lg); }
+  .thread-list { padding-bottom: calc(var(--tabbar-h) + 90px + env(safe-area-inset-bottom)); }
+  body.reading .tabbar { display: none; }
   .reader-pane { display: none; }
   body.reading .list-pane { display: none; }
   body.reading .reader-pane { display: flex; }
@@ -589,8 +606,8 @@ select.compose-input { cursor: pointer; }
   .fab {
     position: fixed;
     right: 20px;
-    bottom: calc(20px + env(safe-area-inset-bottom));
-    z-index: 500;
+    bottom: calc(var(--tabbar-h) + 16px + env(safe-area-inset-bottom));
+    z-index: 950;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -602,7 +619,7 @@ select.compose-input { cursor: pointer; }
     box-shadow: var(--shadow);
   }
   .fab .icon svg { width: 22px; height: 22px; stroke-width: 2.25; }
-  body.has-modal .fab, body.sidebar-open .fab, body.reading .fab { display: none; }
+  body.has-modal .fab, body.show-folders .fab, body.reading .fab { display: none; }
 }
 
 @media (prefers-reduced-motion: reduce) {

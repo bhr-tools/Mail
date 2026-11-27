@@ -17,18 +17,18 @@
   <link rel="stylesheet" href="/css/style.css">
   <script type="module" src="/js/app.js"></script>
 </head>
-<body>
+<body class="has-tabbar">
   <div class="app">
     <aside class="sidebar" id="sidebar" aria-label="Folders">
       <div class="sidebar-header">
         <span class="brand">Mail</span>
+        <h1 class="phone-title">Folders</h1>
         <button type="button" class="icon-button" id="auth-menu" title="Security" hidden></button>
         <button type="button" class="icon-button" id="settings-menu" title="Settings"></button>
       </div>
       <button type="button" class="compose-button" id="compose-button" title="New message (c)"></button>
       <nav class="folder-nav" id="folders"></nav>
     </aside>
-    <div class="sidebar-backdrop" id="sidebar-backdrop"></div>
 
     <section class="list-pane" id="list-pane">
       <header class="pane-header">
@@ -45,6 +45,7 @@
   </div>
 
   <button type="button" class="fab" id="fab" title="New message" aria-label="New message"></button>
+  <nav id="tabbar"></nav>
 
   <footer class="statusbar">
     <div class="status-left">

@@ -487,8 +487,11 @@ def phone(browser):
     page.get_by_role("button", name="Unlock").click()
     expect(rows(page).first).to_be_visible()
     shot(page, "08-phone-list")
+    # Tabs at the bottom: Inbox (with its unread count), Folders, Search.
+    expect(page.locator(".tab.active")).to_have_text(re.compile("Inbox"))
+    expect(page.locator("#search-button")).to_be_hidden()
     # The search page fills the screen; nothing spills sideways.
-    page.locator("#search-button").tap()
+    page.locator(".tab[data-tab=search]").tap()
     page.locator("#search-input").fill("lab")
     expect(page.locator(".search-hit")).to_have_count(1)
     assert page.evaluate("document.documentElement.scrollWidth <= window.innerWidth"), "search page wider than the phone"
@@ -501,6 +504,7 @@ def phone(browser):
     expect(page.locator(".reader-subject")).to_be_hidden()
     expect(page.locator(".list-pane")).to_be_hidden()
     shot(page, "09-phone-reader")
+    expect(page.locator(".back-button")).to_contain_text("Inbox")
     page.locator(".back-button").tap()
     expect(page.locator(".list-pane")).to_be_visible()
 
@@ -569,11 +573,21 @@ def phone(browser):
         page.wait_for_timeout(16)
     touch("touchEnd")
     expect(page.locator(".list-pane")).to_be_visible()
-    page.keyboard.press("K")
-    expect(page.locator("#list-title")).to_contain_text("Inbox")
+    # A folder is a page pushed from the Folders page: "‹ Folders" or a
+    # swipe from the left edge goes back to it; every folder is listed.
+    expect(page.locator("#menu-toggle")).to_contain_text("Folders")
     page.locator("#menu-toggle").tap()
-    expect(page.locator(".sidebar.open")).to_be_visible()
+    expect(page.locator(".sidebar")).to_be_visible()
+    expect(page.locator(".tab.active")).to_have_text(re.compile("Folders"))
+    expect(page.locator("#folders .folder-row", has_text="Robotics")).to_be_visible()
+    expect(page.locator(".fab")).to_be_hidden()
     shot(page, "10-phone-folders")
+    page.locator("#folders .folder-row", has_text="Sent").tap()
+    expect(page.locator("#list-title")).to_contain_text("Sent")
+    expect(page.locator(".sidebar")).to_be_hidden()
+    page.locator(".tab[data-tab=inbox]").tap()
+    expect(page.locator("#list-title")).to_contain_text("Inbox")
+    expect(page.locator("#menu-toggle")).to_be_hidden()
     ctx.close()
 
 

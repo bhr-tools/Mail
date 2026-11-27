@@ -100,6 +100,7 @@ export function renderSidebar(app) {
     }
   }
   nav.replaceChildren(...rows);
+  app.renderTabs?.();
 }
 
 function sectionHeader(app, a) {

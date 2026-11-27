@@ -12,6 +12,7 @@ import { openAddySettings } from './views/addy.js';
 import { describeQuery, openSearchPage } from './views/search.js';
 import { initKeys } from './keys.js';
 import { edgeSwipe, pullToRefresh } from '/kit/js/swipe.js';
+import { tabBar } from '/kit/js/tabbar.js';
 import { createLock } from '/kit/js/lock.js';
 import { createUndo } from '/kit/js/undo.js';
 import { openHelp } from '/kit/js/help.js';
@@ -212,7 +213,8 @@ class App {
   }
 
   isExpanded(id) {
-    return this.expanded.has(id);
+    // On a phone the Folders page lists every folder.
+    return this.expanded.has(id) || !this.wide();
   }
 
   /** Moves an account to position index of the sidebar, for good. */
@@ -279,6 +281,11 @@ class App {
   // Rendering of the chrome
   // -------------------------------------------------------------------------
 
+  /** The list the reader goes back to: "Inbox", "Archive", "Search". */
+  listName() {
+    return this.state.search ? 'Search' : folderLabel(this.state.view.role);
+  }
+
   renderTitle() {
     const { view, search, accounts } = this.state;
     const title = $('list-title');
@@ -290,6 +297,7 @@ class App {
       title.replaceChildren(folderLabel(view.role), suffix ? h('span', { class: 'muted' }, ` · ${suffix}`) : '');
     }
     document.title = `${search ? 'Search' : folderLabel(view.role)} · Mail`;
+    this.renderTabs();
   }
 
   renderStatus(mode) {
@@ -1052,29 +1060,77 @@ class App {
   // Static chrome
   // -------------------------------------------------------------------------
 
-  openSidebar() {
-    $('sidebar').classList.add('open');
-    $('sidebar-backdrop').classList.add('open');
-    document.body.classList.add('sidebar-open');
+  // Phones: a tab bar (Inbox, Folders, Search) instead of a drawer. The
+  // sidebar is the Folders page; a folder is a page pushed from it (back:
+  // "‹ Folders" or a swipe from the left edge).
+
+  /** The inbox of every account: the Inbox tab. */
+  inInbox() {
+    const { view, search } = this.state;
+    return !search && view.role === 'inbox' && !view.account;
   }
 
+  selectTab(id) {
+    if (id === 'search') return this.openSearch();
+    if (id === 'folders') return this.showFolders();
+    this.hideFolders();
+    if (!this.inInbox()) this.setView('inbox', '');
+    else $('thread-list').scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  showFolders() {
+    this.closeReader();
+    document.body.classList.add('show-folders');
+    this.renderTabs();
+  }
+
+  hideFolders() {
+    document.body.classList.remove('show-folders');
+    this.renderTabs();
+  }
+
+  /** "‹ Folders" in a folder; "‹ Inbox" in search results. */
+  goBack() {
+    if (this.state.search) this.selectTab('inbox');
+    else this.showFolders();
+  }
+
+  renderTabs() {
+    const folders = document.body.classList.contains('show-folders');
+    const inFolder = !this.inInbox();
+    this.tabs?.setActive(folders || (inFolder && !this.state.search) ? 'folders' : 'inbox');
+    document.body.classList.toggle('in-folder', inFolder);
+    const label = $('menu-toggle').querySelector('.back-label');
+    if (label) label.textContent = this.state.search ? 'Inbox' : 'Folders';
+    const unread = this.state.accounts.reduce((n, a) => n + (a.folders.find((f) => f.role === 'inbox')?.unread || 0), 0);
+    this.tabs?.setBadge('inbox', unread);
+  }
+
+  // A folder chosen in the sidebar: on a phone, its page replaces the Folders page.
   closeSidebar() {
-    $('sidebar').classList.remove('open');
-    $('sidebar-backdrop').classList.remove('open');
-    document.body.classList.remove('sidebar-open');
+    this.hideFolders();
   }
 
   bindChrome() {
     const setIcon = (id, name) => $(id).prepend(icon(name));
     setIcon('settings-menu', 'more');
-    setIcon('menu-toggle', 'menu');
+    // Phones only: back from a folder to the Folders page.
+    $('menu-toggle').append(icon('chevronLeft'), h('span', { class: 'back-label' }, 'Folders'));
     setIcon('search-button', 'search');
     setIcon('refresh-button', 'refresh');
     setIcon('fab', 'compose');
     $('compose-button').append(icon('compose'), h('span', null, 'New message'), h('kbd', null, 'c'));
 
-    $('menu-toggle').addEventListener('click', () => this.openSidebar());
-    $('sidebar-backdrop').addEventListener('click', () => this.closeSidebar());
+    $('menu-toggle').addEventListener('click', () => this.goBack());
+    this.tabs = tabBar($('tabbar'), [
+      { id: 'inbox', label: 'Inbox', icon: 'inbox' },
+      { id: 'folders', label: 'Folders', icon: 'folder' },
+      { id: 'search', label: 'Search', icon: 'search' },
+    ], { onSelect: (id) => this.selectTab(id) });
+    this.renderTabs();
+    edgeSwipe($('list-pane'), () => {
+      if (!this.wide() && !this.inInbox()) this.goBack();
+    });
     $('compose-button').addEventListener('click', () => this.compose());
     $('fab').addEventListener('click', () => this.compose());
     $('search-button').addEventListener('click', () => this.openSearch());

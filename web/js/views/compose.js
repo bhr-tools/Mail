@@ -249,7 +249,7 @@ export function openCompose(app, source = {}) {
     ],
     footer: [
       h('button', { type: 'button', class: 'button ghost danger-text', title: 'Discard', onclick: discard }, icon('trash')),
-      h('button', { type: 'button', class: 'button ghost', title: 'Attach files', onclick: () => picker.click() }, icon('paperclip'), 'Attach'),
+      h('button', { type: 'button', class: 'button ghost', title: 'Attach files', onclick: () => picker.click() }, icon('paperclip'), h('span', { class: 'button-label' }, 'Attach')),
       status,
       h('span', { class: 'spacer' }),
       h('button', { type: 'button', class: 'button', title: 'Save draft (Ctrl+S)', onclick: () => saveDraft({ close: true }) }, 'Save draft'),
