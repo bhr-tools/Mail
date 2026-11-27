@@ -258,6 +258,7 @@ func isHTTPS(r *http.Request) bool {
 //
 //	v2$<iterations>$<salt hex>$<key hex>   standard PBKDF2-HMAC-SHA256
 //	<salt hex>$<key hex>                   GetDone's first release (non-standard PBKDF2 variant)
+//	s1$<salt hex>$<sha256 hex>             Focus's first release: SHA-256(salt + password)
 //
 // Outdated hashes are verified as before and replaced by a v2 hash with
 // today's iterations on the next successful login.
@@ -291,6 +292,16 @@ func checkPassword(password, stored string) (ok, outdated bool) {
 			return false, false
 		}
 		return subtle.ConstantTimeCompare(got, want) == 1, iterations < pbkdf2Iterations
+	case len(parts) == 3 && parts[0] == "s1":
+		salt, errSalt := hex.DecodeString(parts[1])
+		want, errKey := hex.DecodeString(parts[2])
+		if errSalt != nil || errKey != nil {
+			return false, false
+		}
+		h := sha256.New()
+		h.Write(salt)
+		h.Write([]byte(password))
+		return subtle.ConstantTimeCompare(h.Sum(nil), want) == 1, true
 	case len(parts) == 2:
 		salt, errSalt := hex.DecodeString(parts[0])
 		want, errKey := hex.DecodeString(parts[1])
@@ -389,6 +400,19 @@ func (a *Auth) VerifyPassword(password string) (bool, error) {
 		}
 	}
 	return ok, nil
+}
+
+// PasswordStamp returns an opaque value that changes whenever the master
+// password does ("" when none is set), so a caller checking the password on
+// every request (CalDAV's Basic authentication) can cache a success until
+// then.
+func (a *Auth) PasswordStamp() (string, error) {
+	var stored string
+	err := a.db.QueryRow(`SELECT value FROM auth_settings WHERE key = 'password_hash'`).Scan(&stored)
+	if err == sql.ErrNoRows {
+		return "", nil
+	}
+	return tokenHash(stored), err
 }
 
 // ---------------------------------------------------------------------------
@@ -519,11 +543,22 @@ func (a *Auth) RequestAppToken(r *http.Request) *AppToken {
 	if err != nil {
 		return nil
 	}
-	t.CreatedAt, _ = time.Parse(time.DateTime, created)
+	t.CreatedAt, _ = parseTime(created)
 	now := time.Now().UTC()
 	t.UsedAt = &now
 	_, _ = a.db.Exec(`UPDATE kit_app_tokens SET used_at = ? WHERE id = ?`, now.Format(time.DateTime), t.ID)
 	return &t
+}
+
+// parseTime reads a stored time: the SQLite driver hands DATETIME columns
+// back as RFC 3339, whatever text was written.
+func parseTime(s string) (time.Time, error) {
+	for _, layout := range []string{time.RFC3339Nano, time.DateTime} {
+		if t, err := time.Parse(layout, s); err == nil {
+			return t, nil
+		}
+	}
+	return time.Time{}, fmt.Errorf("unreadable time %q", s)
 }
 
 // AppTokens lists the tokens, newest first.
@@ -541,9 +576,9 @@ func (a *Auth) AppTokens() ([]AppToken, error) {
 		if err := rows.Scan(&t.ID, &t.Name, &t.Scope, &created, &used); err != nil {
 			return nil, err
 		}
-		t.CreatedAt, _ = time.Parse(time.DateTime, created)
+		t.CreatedAt, _ = parseTime(created)
 		if used.Valid {
-			u, _ := time.Parse(time.DateTime, used.String)
+			u, _ := parseTime(used.String)
 			t.UsedAt = &u
 		}
 		tokens = append(tokens, t)

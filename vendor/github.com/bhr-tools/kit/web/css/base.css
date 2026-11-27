@@ -154,6 +154,7 @@ kbd {
   color: var(--warn);
   font: 600 var(--fs-xs)/1.6 var(--font-mono);
   text-align: center;
+  white-space: nowrap;
 }
 
 .icon { display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; }
