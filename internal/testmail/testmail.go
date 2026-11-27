@@ -189,6 +189,7 @@ func (s *Server) Seed(now time.Time) error {
 		{"Archive", plain(now.Add(-40*day), "Camille Martin <camille@inp.test>", Address, "Project kickoff", "kickoff@inp.test", "",
 			"Hi Ben,\n\nThe project kickoff is moved to Thursday 10:00, room B204.\n\nCamille"), []imap.Flag{imap.FlagSeen}},
 		{"Archive", fixedLayout(now.Add(-20 * day)), []imap.Flag{imap.FlagSeen}},
+		{"Archive", forwarded(now.Add(-15*day), s.ImageURL), []imap.Flag{imap.FlagSeen}},
 		{"Archive", plain(now.Add(-12*day), "Bank <noreply@bank.test>", Address, "Your October statement", "stmt@bank.test", "",
 			"Your statement is available in your online space."), []imap.Flag{imap.FlagSeen}},
 		{"INBOX", plain(now.Add(-3*day), "Camille Martin <camille@inp.test>", Address, "Lab report review", "lab1@inp.test", "",
@@ -256,6 +257,21 @@ func fixedLayout(date time.Time) string {
 		`This short module shows how to spot them, in twenty minutes.</p></td></tr></table></td></tr></table></body></html>`
 	return header(date, "Security Training <training@school.test>", Address,
 		"Ben Martin, your cyber e-learning module on phishing and passwords is waiting for you", "elearning@school.test", "") +
+		"Content-Type: text/html; charset=utf-8\r\n\r\n" + html + "\r\n"
+}
+
+// forwarded is mail through an alias forwarder: a long sender name, a
+// banner of long unbroken addresses above the message, and remote images.
+func forwarded(date time.Time, image string) string {
+	html := `<html><body><table style="width:100%;background:#f5f6fa"><tr><td style="padding:8px;font-family:sans-serif;font-weight:bold;color:#1a1a5e">` +
+		`This email was sent to campaign-alias-2027@demo-forwarder.test from nepasrepondre-campagne-dons@association-politique.test<br>` +
+		`<a href="https://forwarder.test/deactivate">Deactivate</a> | <a href="https://forwarder.test/block">Block email</a> | ` +
+		`<a href="https://forwarder.test/block-domain">Block domain</a><br>Removed 1 tracking pixel - <a href="https://forwarder.test/report">View report</a></td></tr></table>` +
+		`<table width="100%"><tr><td align="center"><table style="width:560px;border:1px solid #ccc"><tr><td style="padding:16px;font-size:20px">` +
+		`<img src="` + image + `" width="560" height="120" alt="Campaign"><h1 style="color:#4b0082;text-align:center">Objective: one million by the 30th</h1>` +
+		`<p style="text-align:justify">You answered our call last week: thank you for your interest in this campaign.</p></td></tr></table></td></tr></table></body></html>`
+	return header(date, "Association politique 'nepasrepondre-campagne-dons at association-politique.test' <campaign-alias-2027@demo-forwarder.test>", Address,
+		"Objective: one million by the 30th", "campaign@forwarder.test", "") +
 		"Content-Type: text/html; charset=utf-8\r\n\r\n" + html + "\r\n"
 }
 

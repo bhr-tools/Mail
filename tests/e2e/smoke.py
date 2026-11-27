@@ -550,6 +550,25 @@ def phone(browser):
     expect(page.locator(".popover.sheet")).to_contain_text("Mark as unread")
     page.keyboard.press("Escape")
     page.locator(".back-button").tap()
+    # Mail through an alias forwarder: a long sender name, long addresses.
+    # Nothing scrolls sideways, and the thumb swipe from the left edge goes
+    # back even over the frame of the message (real touches, hit-tested).
+    row(page, "one million").tap()
+    expect(page.locator(".images-banner")).to_be_visible()
+    page.wait_for_function("() => document.querySelector('iframe.mail-frame')?.contentDocument?.body")
+    width = page.evaluate("() => { const r = document.querySelector('.reader-pane'); return [r.scrollWidth, r.clientWidth]; }")
+    assert width[0] <= width[1], f"reader scrolls sideways: {width}"
+    shot(page, "09c-phone-forwarded-mail")
+    frame = rect(page.locator("iframe.mail-frame"))
+    y = frame["y"] + min(frame["height"], 300) / 2
+    cdp = ctx.new_cdp_session(page)
+    touch = lambda kind, x=None: cdp.send("Input.dispatchTouchEvent", {"type": kind, "touchPoints": [] if x is None else [{"x": x, "y": y}]})
+    touch("touchStart", 6)
+    for x in range(20, 300, 20):
+        touch("touchMove", x)
+        page.wait_for_timeout(16)
+    touch("touchEnd")
+    expect(page.locator(".list-pane")).to_be_visible()
     page.keyboard.press("K")
     expect(page.locator("#list-title")).to_contain_text("Inbox")
     page.locator("#menu-toggle").tap()

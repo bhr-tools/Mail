@@ -86,7 +86,7 @@ func TestSyncFoldersThreadsAndBodies(t *testing.T) {
 	if invoice == nil || !invoice.Attachments {
 		t.Errorf("invoice = %+v", invoice)
 	}
-	if len(threads(t, store, config.Drafts)) != 1 || len(threads(t, store, config.Trash)) != 1 || len(threads(t, store, config.Archive)) != 3 {
+	if len(threads(t, store, config.Drafts)) != 1 || len(threads(t, store, config.Trash)) != 1 || len(threads(t, store, config.Archive)) != 4 {
 		t.Error("drafts, trash or archive not synchronized")
 	}
 	if spam := threads(t, store, config.Junk); len(spam) != 1 || spam[0].Latest.Subject != "You won!" {

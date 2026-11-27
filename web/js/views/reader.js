@@ -75,6 +75,9 @@ function fitFrame(app, frame) {
         const natural = doc.documentElement.scrollWidth;
         if (natural > w + 1) doc.body.style.zoom = String(w / natural);
       }
+      // What still overflows is cut: a sideways scroll in the frame would
+      // take the swipe back.
+      doc.documentElement.style.overflowX = 'hidden';
       frame.style.height = `${Math.max(60, Math.ceil(doc.documentElement.scrollHeight))}px`;
     };
     fit();
@@ -99,7 +102,7 @@ function imagesBanner(app, c) {
     h('button', {
       type: 'button', class: 'button ghost', title: `Always show the images of ${c.m.from.address}`,
       onclick: () => app.showImages(c.m.id, true),
-    }, `Always for ${personName(c.m.from)}`));
+    }, h('span', { class: 'button-text' }, `Always for ${personName(c.m.from)}`)));
 }
 
 function attachments(app, c) {
