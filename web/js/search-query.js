@@ -8,13 +8,16 @@ export const PERIODS = [['', 'Any time'], ['7d', '7 days'], ['30d', '30 days'], 
 const ROLES = ['inbox', 'archive', 'sent', 'drafts', 'trash', 'junk'];
 const ROLE_ALIASES = { done: 'archive', archived: 'archive', spam: 'junk', anywhere: 'all' };
 const CUSTOM = 'folder:';
+const DAY = /^\d{4}-\d{2}-\d{2}$/;
 
 /**
  * A blank form. folder: '' searches everywhere but the trash and spam, 'all'
- * everywhere, a role one folder ('inbox', 'folder:Receipts').
+ * everywhere, a role one folder ('inbox', 'folder:Receipts'). after and
+ * before are days (2026-01-31), both included; the same day in both is that
+ * one day.
  */
 export function emptyForm() {
-  return { text: '', account: '', folder: '', unread: false, starred: false, attachment: false, period: '', from: '', to: '' };
+  return { text: '', account: '', folder: '', unread: false, starred: false, attachment: false, period: '', after: '', before: '', from: '', to: '' };
 }
 
 /** Whether the form asks for anything (a blank form lists nothing). */
@@ -42,6 +45,11 @@ export function toQuery(form) {
   if (form.starred) parts.push('is:starred');
   if (form.attachment) parts.push('has:attachment');
   if (form.period) parts.push(`newer:${form.period}`);
+  if (form.after && form.after === form.before) parts.push(`on:${form.after}`);
+  else {
+    if (form.after) parts.push(`after:${form.after}`);
+    if (form.before) parts.push(`before:${form.before}`);
+  }
   return parts.join(' ');
 }
 
@@ -95,6 +103,13 @@ export function fromQuery(query) {
         break;
       case 'has':
         if (/^attachment/i.test(v)) form.attachment = true;
+        break;
+      case 'on':
+      case 'after':
+      case 'before':
+        if (!DAY.test(v)) used = false;
+        else if (key === 'on') form.after = form.before = v;
+        else form[key] = v;
         break;
       case 'newer':
         if (PERIODS.some(([p]) => p && p === v.toLowerCase())) form.period = v.toLowerCase();

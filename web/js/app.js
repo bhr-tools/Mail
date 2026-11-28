@@ -126,6 +126,7 @@ class App {
       view.role = 'inbox';
     }
     if (this.state.accounts.length === 1) view.account = '';
+    this.buildTabs();
     renderSidebar(this);
     this.renderTitle();
     this.renderStatus();
@@ -294,7 +295,8 @@ class App {
     } else {
       const account = this.accountOf(view.account);
       const suffix = accounts.length > 1 && account ? account.name : '';
-      title.replaceChildren(folderLabel(view.role), suffix ? h('span', { class: 'muted' }, ` · ${suffix}`) : '');
+      // " · INP" beside the folder; under it, alone, on a phone.
+      title.replaceChildren(folderLabel(view.role), suffix ? h('span', { class: 'muted list-account' }, suffix) : '');
     }
     document.title = `${search ? 'Search' : folderLabel(view.role)} · Mail`;
     this.renderTabs();
@@ -1060,22 +1062,45 @@ class App {
   // Static chrome
   // -------------------------------------------------------------------------
 
-  // Phones: a tab bar (Inbox, Folders, Search) instead of a drawer. The
-  // sidebar is the Folders page; a folder is a page pushed from it (back:
-  // "‹ Folders" or a swipe from the left edge).
+  // Phones: a tab bar instead of a drawer: the inbox of each account (no
+  // inbox mixing them), Folders, Search. The sidebar is the Folders page; a
+  // folder is a page pushed from it (back: "‹ Folders" or a swipe from the
+  // left edge).
 
-  /** The inbox of every account: the Inbox tab. */
+  /** An inbox, of any account: one of the account tabs. */
   inInbox() {
     const { view, search } = this.state;
-    return !search && view.role === 'inbox' && !view.account;
+    return !search && view.role === 'inbox';
+  }
+
+  /** One tab per account inbox ("inbox:perso"), or "inbox" for a single account. */
+  inboxTab(account) {
+    return this.state.accounts.length > 1 ? `inbox:${account}` : 'inbox';
+  }
+
+  /** (Re)builds the tab bar when the accounts change. */
+  buildTabs() {
+    const { accounts } = this.state;
+    const key = accounts.map((a) => `${a.id}:${a.name}`).join(',');
+    if (this.tabs && key === this.tabsKey) return;
+    this.tabsKey = key;
+    const inboxes = accounts.length > 1
+      ? accounts.map((a) => ({ id: this.inboxTab(a.id), label: a.name, icon: 'inbox' }))
+      : [{ id: 'inbox', label: 'Inbox', icon: 'inbox' }];
+    this.tabs = tabBar($('tabbar'), [
+      ...inboxes,
+      { id: 'folders', label: 'Folders', icon: 'folder' },
+      { id: 'search', label: 'Search', icon: 'search' },
+    ], { onSelect: (id) => this.selectTab(id) });
   }
 
   selectTab(id) {
     if (id === 'search') return this.openSearch();
     if (id === 'folders') return this.showFolders();
+    const account = id.startsWith('inbox:') ? id.slice('inbox:'.length) : '';
     this.hideFolders();
-    if (!this.inInbox()) this.setView('inbox', '');
-    else $('thread-list').scrollTo({ top: 0, behavior: 'smooth' });
+    if (this.inInbox() && this.state.view.account === account) $('thread-list').scrollTo({ top: 0, behavior: 'smooth' });
+    else this.setView('inbox', account);
   }
 
   showFolders() {
@@ -1091,19 +1116,23 @@ class App {
 
   /** "‹ Folders" in a folder; "‹ Inbox" in search results. */
   goBack() {
-    if (this.state.search) this.selectTab('inbox');
+    if (this.state.search) this.selectTab(this.inboxTab(this.state.view.account));
     else this.showFolders();
   }
 
   renderTabs() {
+    if (!this.tabs) return;
+    const { view, search, accounts } = this.state;
     const folders = document.body.classList.contains('show-folders');
     const inFolder = !this.inInbox();
-    this.tabs?.setActive(folders || (inFolder && !this.state.search) ? 'folders' : 'inbox');
+    let active = this.inboxTab(view.account);
+    if (folders || (inFolder && !search)) active = 'folders';
+    else if (search) active = 'search';
+    this.tabs.setActive(active);
     document.body.classList.toggle('in-folder', inFolder);
     const label = $('menu-toggle').querySelector('.back-label');
-    if (label) label.textContent = this.state.search ? 'Inbox' : 'Folders';
-    const unread = this.state.accounts.reduce((n, a) => n + (a.folders.find((f) => f.role === 'inbox')?.unread || 0), 0);
-    this.tabs?.setBadge('inbox', unread);
+    if (label) label.textContent = search ? 'Inbox' : 'Folders';
+    for (const a of accounts) this.tabs.setBadge(this.inboxTab(a.id), a.folders.find((f) => f.role === 'inbox')?.unread || 0);
   }
 
   // A folder chosen in the sidebar: on a phone, its page replaces the Folders page.
@@ -1122,12 +1151,6 @@ class App {
     $('compose-button').append(icon('compose'), h('span', null, 'New message'), h('kbd', null, 'c'));
 
     $('menu-toggle').addEventListener('click', () => this.goBack());
-    this.tabs = tabBar($('tabbar'), [
-      { id: 'inbox', label: 'Inbox', icon: 'inbox' },
-      { id: 'folders', label: 'Folders', icon: 'folder' },
-      { id: 'search', label: 'Search', icon: 'search' },
-    ], { onSelect: (id) => this.selectTab(id) });
-    this.renderTabs();
     edgeSwipe($('list-pane'), () => {
       if (!this.wide() && !this.inInbox()) this.goBack();
     });

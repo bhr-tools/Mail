@@ -152,6 +152,14 @@ func TestQuery(t *testing.T) {
 			t.Errorf("%s: after = %v, match = %q", in, q.After, q.Match)
 		}
 	}
+	// Days are included: on: is one day, before: keeps its own day.
+	jan := func(d int) time.Time { return time.Date(2026, 1, d, 0, 0, 0, 0, time.UTC) }
+	if q := parseQuery("on:2026-01-15", now); !q.After.Equal(jan(15)) || !q.Before.Equal(jan(16)) {
+		t.Errorf("on: %v – %v", q.After, q.Before)
+	}
+	if q := parseQuery("after:2026-01-10 before:2026-01-15", now); !q.After.Equal(jan(10)) || !q.Before.Equal(jan(16)) || q.Text != "" {
+		t.Errorf("range: %v – %v, text %q", q.After, q.Before, q.Text)
+	}
 	// A filter it can't read is looked for as words.
 	if q := parseQuery("newer:soon", now); !q.After.IsZero() || q.Text != "newer:soon" {
 		t.Errorf("bad span: after = %v, text = %q", q.After, q.Text)
@@ -180,6 +188,14 @@ func TestSearchByDate(t *testing.T) {
 	}
 	if n := count("lab newer:1d"); n != 0 {
 		t.Errorf("lab newer than a day = %d", n)
+	}
+	monthAgo := time.Now().AddDate(0, 0, -30).Format(time.DateOnly)
+	if n := count("in:archive before:" + monthAgo); n != 1 {
+		t.Errorf("archive before %s = %d", monthAgo, n)
+	}
+	kickoff := time.Now().AddDate(0, 0, -40).Format(time.DateOnly)
+	if n := count("in:archive on:" + kickoff); n != 1 {
+		t.Errorf("archive on %s = %d", kickoff, n)
 	}
 }
 

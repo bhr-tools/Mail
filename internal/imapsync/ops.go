@@ -158,11 +158,16 @@ func (a *Account) locate(c *imapclient.Client, f *db.Folder, messageIDs []string
 }
 
 // SearchServer looks for messages older than the local copy, in the archive
-// and sent mail, and adds the matches to the local copy. It returns how many
-// were added.
-func (a *Account) SearchServer(text string, limit int) (int, error) {
+// and sent mail, and adds the matches to the local copy: messages holding
+// text, received from after (included) to before (excluded); zero times and
+// empty text leave that out. It returns how many were added.
+func (a *Account) SearchServer(text string, after, before time.Time, limit int) (int, error) {
 	text = strings.TrimSpace(text)
-	if text == "" {
+	criteria := imap.SearchCriteria{Since: after, Before: before}
+	if text != "" {
+		criteria.Text = []string{text}
+	}
+	if text == "" && after.IsZero() && before.IsZero() {
 		return 0, nil
 	}
 	// On Gmail, All Mail already holds the sent mail: one search is enough.
@@ -185,7 +190,7 @@ func (a *Account) SearchServer(text string, limit int) (int, error) {
 			if sel.UIDValidity != f.UIDValidity {
 				continue // not synchronized yet
 			}
-			data, err := c.UIDSearch(&imap.SearchCriteria{Text: []string{text}}, nil).Wait()
+			data, err := c.UIDSearch(&criteria, nil).Wait()
 			if err != nil {
 				return err
 			}
@@ -223,7 +228,7 @@ func (a *Account) SearchServer(text string, limit int) (int, error) {
 		}
 		return nil
 	})
-	log.Printf("%s: server search %q: %d added in %s", a.cfg.ID, text, added, time.Since(start).Round(time.Millisecond))
+	log.Printf("%s: server search %q %s–%s: %d added in %s", a.cfg.ID, text, after.Format(time.DateOnly), before.Format(time.DateOnly), added, time.Since(start).Round(time.Millisecond))
 	if err == nil && added > 0 {
 		a.store.Changed()
 	}

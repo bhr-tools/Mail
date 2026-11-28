@@ -23,6 +23,8 @@ type Filter struct {
 	Attachments bool
 	// After keeps the messages received since then (zero: any date).
 	After time.Time
+	// Before keeps the messages received before then (zero: any date).
+	Before time.Time
 	// NotInInbox leaves out the messages that are also in the inbox: Gmail's
 	// All Mail is the archive, but holds the inbox too.
 	NotInInbox bool
@@ -90,6 +92,10 @@ func (f *Filter) where() (string, []any) {
 	if !f.After.IsZero() {
 		conds = append(conds, `m.date >= ?`)
 		args = append(args, f.After.Unix())
+	}
+	if !f.Before.IsZero() {
+		conds = append(conds, `m.date < ?`)
+		args = append(args, f.Before.Unix())
 	}
 	if f.NotInInbox {
 		conds = append(conds, `NOT EXISTS (SELECT 1 FROM messages i JOIN folders fi ON fi.id = i.folder_id

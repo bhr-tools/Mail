@@ -1,10 +1,13 @@
 // Search: a full-screen page, as in the calendar. Results come as you type;
-// the filters (account, folder, state, period, people) build the same query
-// string a person could type ("from:camille in:archive newer:30d").
+// the filters (account, folder, state, period, people) live on a page of
+// their own (the Filters button), the active ones as removable chips under
+// the field. They build the same query string a person could type
+// ("from:camille in:archive newer:30d").
 
 import { api } from '../api.js';
 import { h, icon } from '../dom.js';
 import { openModal, toast } from '/kit/js/overlay.js';
+import { isMobile } from '../dom.js';
 import { PERIODS, emptyForm, fromQuery, hasCriteria, toQuery } from '../search-query.js';
 import { ROLE_LABELS, folderLabel, isCustom } from './sidebar.js';
 import { rowContent, threadKey } from './list.js';
@@ -18,6 +21,17 @@ function accountId(app, value) {
   if (!value) return '';
   const v = value.toLowerCase();
   return app.state.accounts.find((a) => a.id.toLowerCase() === v || a.name.toLowerCase() === v)?.id ?? value;
+}
+
+const dayLabel = (d) => new Date(`${d}T00:00`).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+
+/** "on 3 Mar 2026", "3 Mar 2026 – 9 Mar 2026", "since …", "until …", or ''. */
+function describeDays({ after, before }) {
+  if (after && after === before) return `on ${dayLabel(after)}`;
+  if (after && before) return `${dayLabel(after)} – ${dayLabel(before)}`;
+  if (after) return `since ${dayLabel(after)}`;
+  if (before) return `until ${dayLabel(before)}`;
+  return '';
 }
 
 const folderName = (role) => (isCustom(role) ? role.slice('folder:'.length) : ROLE_LABELS[role] || role);
@@ -36,6 +50,7 @@ export function describeQuery(app, query) {
     form.starred && 'starred',
     form.attachment && 'with attachment',
     form.period && `last ${PERIODS.find(([p]) => p === form.period)?.[1]}`,
+    describeDays(form),
   ].filter(Boolean).join(' · ');
 }
 
@@ -50,10 +65,45 @@ export function openSearchPage(app, { query = '' } = {}) {
     autocomplete: 'off', spellcheck: false, attrs: { 'aria-label': 'Search' },
   });
   const count = h('span', { class: 'search-count' });
+  const filterBadge = h('span', { class: 'filter-badge' });
+  const filtersButton = h('button', { type: 'button', class: 'filters-button', title: 'Filters', onclick: () => openFilters() },
+    icon('filter'), h('span', { class: 'filters-label' }, 'Filters'), filterBadge);
+  const activeChips = h('div', { class: 'search-active' });
+  const summary = h('div', { class: 'search-summary' }, activeChips, count);
+  let filtersPage = null;
+  let showButton = null;
   const accountChips = h('div', { class: 'search-chips' });
   const folderSelect = h('select', { class: 'input search-select', attrs: { 'aria-label': 'Folder' } });
   const stateChips = h('div', { class: 'search-chips' });
   const periodSwitch = h('div', { class: 'segmented' });
+  // Precise dates: one day, or a range when the second day is set too.
+  const dayInput = (label) => h('input', { type: 'date', class: 'input search-day', attrs: { 'aria-label': label } });
+  const startDay = dayInput('Day, or first day');
+  const endDay = dayInput('Last day (optional)');
+  const datesHint = h('span', { class: 'search-hint search-dates-hint' });
+  const datesRow = h('div', { class: 'search-dates' },
+    h('span', { class: 'search-field' }, icon('calendar')), startDay, h('span', { class: 'search-hint' }, 'to'), endDay, datesHint);
+  let datesShown = !!(form.after || form.before);
+  const fillDates = () => {
+    startDay.value = form.after;
+    endDay.value = form.before === form.after ? '' : form.before;
+    endDay.min = form.after;
+    datesHint.textContent = !form.after && !form.before ? 'Pick a day, or two for a range'
+      : form.after && !endDay.value ? 'Just this day' : '';
+    datesRow.hidden = !datesShown;
+  };
+  const readDates = () => {
+    form.after = startDay.value;
+    // The last day left empty: the first day alone.
+    form.before = endDay.value && endDay.value >= startDay.value ? endDay.value : startDay.value;
+    if (!startDay.value) form.before = endDay.value;
+    form.period = '';
+    fillDates();
+    drawPeriods();
+    search();
+  };
+  startDay.addEventListener('change', readDates);
+  endDay.addEventListener('change', readDates);
   const contacts = h('datalist', { id: 'search-contacts' });
   // People, not dates: next to the periods, a bare "From … To …" read as a
   // date range.
@@ -139,13 +189,116 @@ export function openSearchPage(app, { query = '' } = {}) {
 
   const drawPeriods = () => periodSwitch.replaceChildren(...PERIODS.map(([value, label]) => h('button', {
     type: 'button',
-    class: value === form.period && 'active',
+    class: !datesShown && value === form.period && 'active',
     onclick: () => {
       form.period = value;
+      form.after = form.before = '';
+      datesShown = false;
+      fillDates();
       drawPeriods();
       search();
     },
-  }, label)));
+  }, label)), h('button', {
+    type: 'button',
+    class: datesShown && 'active',
+    title: 'One day, or a range of days',
+    onclick: () => {
+      datesShown = true;
+      form.period = '';
+      fillDates();
+      drawPeriods();
+      search();
+      startDay.focus();
+      try { startDay.showPicker(); } catch { /* not every browser */ }
+    },
+  }, 'Dates'));
+
+  // The filters in use, each with a way to drop it: the chips under the field.
+  const activeFilters = () => {
+    const out = [];
+    const account = app.accountOf(form.account);
+    if (several && form.account) out.push({ label: account?.name || form.account, color: account && app.colorOf(account.id), clear: () => { form.account = ''; } });
+    if (form.folder) out.push({ label: form.folder === 'all' ? 'With trash and spam' : `In ${folderName(form.folder)}`, clear: () => { form.folder = ''; } });
+    if (form.unread) out.push({ label: 'Unread', clear: () => { form.unread = false; } });
+    if (form.starred) out.push({ label: 'Starred', clear: () => { form.starred = false; } });
+    if (form.attachment) out.push({ label: 'With attachment', clear: () => { form.attachment = false; } });
+    if (form.period) out.push({ label: `Last ${PERIODS.find(([p]) => p === form.period)?.[1]}`, clear: () => { form.period = ''; } });
+    const days = describeDays(form);
+    if (days) out.push({ label: days[0].toUpperCase() + days.slice(1), clear: () => { form.after = form.before = ''; datesShown = false; } });
+    if (form.from.trim()) out.push({ label: `From ${form.from.trim()}`, clear: () => { form.from = ''; fromInput.value = ''; } });
+    if (form.to.trim()) out.push({ label: `To ${form.to.trim()}`, clear: () => { form.to = ''; toInput.value = ''; } });
+    return out;
+  };
+
+  const redrawFilters = () => {
+    drawAccounts();
+    drawFolders();
+    drawStates();
+    drawPeriods();
+    fillDates();
+  };
+
+  const drawSummary = () => {
+    const filters = activeFilters();
+    filterBadge.textContent = filters.length ? String(filters.length) : '';
+    filtersButton.classList.toggle('on', filters.length > 0);
+    activeChips.replaceChildren(...filters.map((f) => h('button', {
+      type: 'button',
+      class: ['search-chip', 'on', f.color && `acc-${f.color}`],
+      title: 'Remove this filter',
+      onclick: () => {
+        f.clear();
+        redrawFilters();
+        search();
+      },
+    }, f.color ? h('span', { class: 'account-dot' }) : null, f.label, icon('close'))));
+    summary.hidden = !filters.length && !count.textContent;
+  };
+
+  const group = (label, ...content) => h('section', { class: 'filter-group' }, h('h3', { class: 'filter-label' }, label), ...content);
+
+  // The filters, on a page of their own; results update behind it.
+  const openFilters = () => {
+    if (filtersPage) return;
+    showButton = h('button', { type: 'button', class: 'button primary', onclick: () => filtersPage.close() }, 'Done');
+    const clearAll = h('button', {
+      type: 'button',
+      class: 'button',
+      onclick: () => {
+        Object.assign(form, emptyForm(), { text: form.text });
+        fromInput.value = toInput.value = '';
+        datesShown = false;
+        redrawFilters();
+        search();
+      },
+    }, 'Clear');
+    filtersPage = openModal({
+      title: 'Filters',
+      className: 'filters-page',
+      autofocus: false,
+      body: [
+        several ? group('Account', accountChips) : null,
+        group('Folder', folderSelect),
+        group('Only', stateChips),
+        group('Date', periodSwitch, datesRow),
+        group('People', h('div', { class: 'search-people' }, fromInput, toInput, contacts)),
+      ],
+      footer: [clearAll, showButton],
+      onClose: () => {
+        filtersPage = null;
+        showButton = null;
+        drawSummary();
+        if (!isMobile()) input.focus();
+      },
+    });
+    filtersPage.el.addEventListener('keydown', (ev) => {
+      if (ev.key === 'Enter' && ev.target.matches('input, select')) {
+        ev.preventDefault();
+        filtersPage.close();
+      }
+    });
+    draw();
+  };
 
   let suggestTimer = 0;
   const suggest = (word) => {
@@ -166,7 +319,10 @@ export function openSearchPage(app, { query = '' } = {}) {
 
   const draw = () => {
     const asked = hasCriteria(form);
-    count.textContent = asked ? `${results.length}${more ? '+' : ''} conversation${results.length === 1 ? '' : 's'}` : '';
+    const found = `${results.length}${more ? '+' : ''} conversation${results.length === 1 ? '' : 's'}`;
+    count.textContent = asked ? found : '';
+    if (showButton) showButton.textContent = asked ? `Show ${found}` : 'Done';
+    drawSummary();
     const items = [];
     if (!results.length) {
       items.push(h('div', { class: 'picker-empty' }, asked ? 'No conversation matches.' : 'Type to search subjects, people and text, or pick a filter.'));
@@ -188,7 +344,8 @@ export function openSearchPage(app, { query = '' } = {}) {
         actions.push(h('button', { type: 'button', class: 'list-more', onclick: () => showInList() },
           'Show in the list ', h('kbd', null, 'Ctrl'), h('kbd', null, '↵')));
       }
-      if (fromQuery(currentQuery()).text.trim()) {
+      const typed = fromQuery(currentQuery());
+      if (typed.text.trim() || typed.after || typed.before) {
         actions.push(h('button', { type: 'button', class: 'list-more', onclick: () => searchServers() },
           icon('search'), ' Search older mail on the servers'));
       }
@@ -203,6 +360,7 @@ export function openSearchPage(app, { query = '' } = {}) {
     const id = ++seq;
     const q = currentQuery();
     app.lastQuery = q;
+    drawSummary();
     if (!hasCriteria(form)) {
       results = [];
       more = false;
@@ -280,13 +438,8 @@ export function openSearchPage(app, { query = '' } = {}) {
       h('div', { class: 'search-header' },
         h('button', { type: 'button', class: 'icon-button', title: 'Close (Esc)', onclick: () => modal.close() }, icon('chevronLeft')),
         h('div', { class: 'picker-search' }, icon('search'), input),
-        count),
-      h('div', { class: 'search-filters' },
-        several ? accountChips : null,
-        h('label', { class: 'search-field' }, icon('folder'), folderSelect),
-        stateChips,
-        periodSwitch,
-        h('div', { class: 'search-people' }, h('span', { class: 'search-field' }, icon('person')), fromInput, toInput, contacts)),
+        filtersButton),
+      summary,
       list,
     ],
   });
@@ -318,10 +471,7 @@ export function openSearchPage(app, { query = '' } = {}) {
     }
   });
 
-  drawAccounts();
-  drawFolders();
-  drawStates();
-  drawPeriods();
+  redrawFilters();
   input.focus();
   input.setSelectionRange(input.value.length, input.value.length);
   if (hasCriteria(form)) search();

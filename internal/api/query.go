@@ -19,7 +19,8 @@ type Query struct {
 
 // ParseQuery reads a search: words, "quoted phrases" and filters
 // (from:, to:, in:, account:, is:unread, is:starred, has:attachment,
-// newer:7d|4w|6m|1y, after:2026-01-31).
+// newer:7d|4w|6m|1y, on:2026-01-31, after:2026-01-01 before:2026-01-31).
+// The days of on:, after: and before: are included.
 // Everything but the trash and spam is searched unless in: says otherwise; in: also
 // takes the name of a folder made by the person (in:Receipts).
 func ParseQuery(s string) Query {
@@ -73,8 +74,18 @@ func parseQuery(s string, now time.Time) Query {
 					continue
 				}
 			case "after":
-				if t, err := time.ParseInLocation("2006-01-02", value, now.Location()); err == nil {
+				if t, ok := day(value, now); ok {
 					q.After = t
+					continue
+				}
+			case "before":
+				if t, ok := day(value, now); ok {
+					q.Before = t.AddDate(0, 0, 1)
+					continue
+				}
+			case "on":
+				if t, ok := day(value, now); ok {
+					q.After, q.Before = t, t.AddDate(0, 0, 1)
 					continue
 				}
 			case "has":
@@ -98,6 +109,12 @@ func parseQuery(s string, now time.Time) Query {
 	q.Match = strings.Join(terms, " ")
 	q.Text = strings.Join(words, " ")
 	return q
+}
+
+// day reads a date such as 2026-01-31: the start of that day.
+func day(v string, now time.Time) (time.Time, bool) {
+	t, err := time.ParseInLocation("2006-01-02", v, now.Location())
+	return t, err == nil
 }
 
 // since reads a span such as 7d, 4w, 6m or 1y back from now.

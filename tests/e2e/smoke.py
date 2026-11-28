@@ -4,6 +4,7 @@ Run against a fresh instance (see tests/e2e/run.sh): one account with
 sample mail, served from memory. Screenshots are written to $OUT.
 """
 import os
+import datetime
 import re
 import sys
 
@@ -278,18 +279,30 @@ def desktop(browser):
     search = page.locator(".search-page")
     hits = page.locator(".search-hit")
     folder = page.locator(".search-select")
+    filters = page.locator(".filters-page")
+    open_filters = lambda: page.locator(".filters-button").click()
+    close_filters = lambda: filters.locator(".modal-footer .primary").click()
     page.keyboard.press("/")
     expect(search).to_be_visible()
     page.keyboard.type("invoice")
     expect(hits).to_have_count(1)
     expect(hits.first).to_contain_text("Invoice for the gala hall")
     shot(page, "search")
+    # The filters are on a page of their own; results update behind it.
+    open_filters()
+    expect(filters).to_be_visible()
     # The folder filter: the invoice is in the inbox, not the archive.
     folder.select_option("archive")
+    expect(filters.locator(".modal-footer .primary")).to_have_text("Show 0 conversations")
+    close_filters()
+    expect(filters).to_have_count(0)
     expect(hits).to_have_count(0)
     expect(search).to_contain_text("No conversation matches.")
-    folder.select_option("")
+    # The active filter is a chip under the field; a click drops it.
+    expect(page.locator(".filters-button .filter-badge")).to_have_text("1")
+    page.locator(".search-active .search-chip", has_text="In Archive").click()
     expect(hits).to_have_count(1)
+    expect(page.locator(".search-active .search-chip")).to_have_count(0)
     # Ctrl+Enter: the results in the list, to act on them.
     page.keyboard.press("Control+Enter")
     expect(search).to_have_count(0)
@@ -300,10 +313,31 @@ def desktop(browser):
     expect(page.locator("#search-input")).to_have_value("invoice")
     page.locator("#search-input").fill("kickoff")
     expect(hits).to_have_count(1)
-    search.get_by_role("button", name="30 days").click()
+    open_filters()
+    filters.get_by_role("button", name="30 days").click()
     expect(hits).to_have_count(0)
-    search.get_by_role("button", name="Any time").click()
+    filters.get_by_role("button", name="Any time").click()
     expect(hits).to_have_count(1)
+    # Precise dates: the kickoff is 40 days old; one day, then a range.
+    day = lambda n: (datetime.date.today() - datetime.timedelta(days=n)).isoformat()
+    filters.get_by_role("button", name="Dates").click()
+    expect(filters.locator(".search-dates")).to_contain_text("Pick a day")
+    filters.get_by_label("Day, or first day").fill(day(40))
+    expect(hits).to_have_count(1)
+    expect(filters.locator(".search-dates")).to_contain_text("Just this day")
+    filters.get_by_label("Day, or first day").fill(day(39))
+    expect(hits).to_have_count(0)
+    filters.get_by_label("Day, or first day").fill(day(45))
+    filters.get_by_label("Last day (optional)").fill(day(35))
+    expect(hits).to_have_count(1)
+    shot(page, "search-dates")
+    filters.get_by_role("button", name="Any time").click()
+    expect(filters.locator(".search-dates")).to_be_hidden()
+    expect(hits).to_have_count(1)
+    # Escape leaves the filters for the results.
+    page.keyboard.press("Escape")
+    expect(filters).to_have_count(0)
+    expect(search).to_be_visible()
     page.locator("#search-input").focus()
     page.keyboard.press("ArrowDown")
     expect(hits.first).to_have_class(re.compile("cursor"))
@@ -319,8 +353,11 @@ def desktop(browser):
     expect(search).to_have_count(0)
     page.keyboard.press("/")
     expect(page.locator("#search-input")).to_have_value("")
+    expect(page.locator(".search-active .search-chip")).to_have_text(["Unread", "From camille"])
+    open_filters()
     expect(page.locator(".search-person").first).to_have_value("camille")
-    expect(search.locator(".search-chip.on")).to_have_text(["Unread"])
+    expect(filters.locator(".search-chip.on")).to_have_text(["Unread"])
+    page.keyboard.press("Escape")
     page.keyboard.press("Escape")
     # Escape leaves the results for the folder.
     page.keyboard.press("Escape")
@@ -496,6 +533,14 @@ def phone(browser):
     expect(page.locator(".search-hit")).to_have_count(1)
     assert page.evaluate("document.documentElement.scrollWidth <= window.innerWidth"), "search page wider than the phone"
     shot(page, "08c-phone-search")
+    page.locator(".filters-button").tap()
+    page.locator(".filters-page").get_by_role("button", name="Dates").tap()
+    page.locator(".filters-page").get_by_label("Day, or first day").fill("2026-03-02")
+    assert page.evaluate("document.documentElement.scrollWidth <= window.innerWidth"), "dates wider than the phone"
+    shot(page, "08d-phone-search-dates")
+    page.locator(".filters-page").get_by_role("button", name="Any time").tap()
+    page.locator(".filters-page .modal-footer .primary").tap()
+    expect(page.locator(".filters-page")).to_have_count(0)
     page.locator(".search-header .icon-button").tap()
     expect(page.locator(".search-page")).to_have_count(0)
     count = rows(page).count()

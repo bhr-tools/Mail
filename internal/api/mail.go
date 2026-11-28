@@ -377,9 +377,9 @@ func (a *API) searchServer(w http.ResponseWriter, r *http.Request) {
 	if !decode(w, r, &req) {
 		return
 	}
-	text := ParseQuery(req.Query).Text
-	if text == "" {
-		writeError(w, http.StatusBadRequest, "Type words to look for")
+	q := ParseQuery(req.Query)
+	if q.Text == "" && q.After.IsZero() && q.Before.IsZero() {
+		writeError(w, http.StatusBadRequest, "Type words or pick dates to look for")
 		return
 	}
 	// The accounts are searched side by side: the slowest server sets the pace.
@@ -396,7 +396,7 @@ func (a *API) searchServer(w http.ResponseWriter, r *http.Request) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			n, err := acc.SearchServer(text, 50)
+			n, err := acc.SearchServer(q.Text, q.After, q.Before, 50)
 			mu.Lock()
 			defer mu.Unlock()
 			found += n
